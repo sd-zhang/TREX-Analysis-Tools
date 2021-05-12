@@ -1,24 +1,10 @@
-import math
 import numpy as np
-from datetime import datetime
-import pytz
-from dateutil.parser import parse as timeparse
-import matplotlib.pyplot as plt
+from _utils import utils
 import dataset
 
-def timestamp_to_local(epoch_ts, timezone):
-    """Converts UNIX timestamp to local datetime object"""
-    return datetime.fromtimestamp(epoch_ts, pytz.timezone(timezone))
-
-def timestr_to_timestamp(time_string:str, timezone:str):
-    timestamp = pytz.timezone(timezone).localize(timeparse(time_string))
-    return int(timestamp.timestamp())
-
 def ts_and_duration(start_datetime_str, end_datetime_str, timezone):
-    start_datetime = pytz.timezone(timezone).localize(timeparse(start_datetime_str))
-    end_datetime = pytz.timezone(timezone).localize(timeparse(end_datetime_str))
-    start_timestamp = start_datetime.timestamp()
-    end_timestamp = end_datetime.timestamp()
+    start_timestamp = utils.timestr_to_timestamp(start_datetime_str, timezone)
+    end_timestamp = utils.timestr_to_timestamp(end_datetime_str, timezone)
     duration_minutes = int((end_timestamp - start_timestamp) / 60)
     timestamps = np.linspace(start_timestamp, end_timestamp, duration_minutes)
     return timestamps, duration_minutes

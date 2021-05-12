@@ -379,7 +379,7 @@ class Solver(object):
 
     # run MCTS for every agent in the game tree...
     def MA_MCTS(self,
-                generations = 10,
+                generations = 30,
                 max_it_per_gen=5000,
                 action_space = {'battery': 3,
                                 'quantity': 8,
@@ -515,9 +515,9 @@ class Solver(object):
         s_now = s_0
         while not finished:
             timestamp, _ = self.decode_states(s_now)
-            if timestamp <= self.time_end and s_now in game_tree:
-                if len(game_tree[s_now]['a']) > 0: #meaning we know the Q values, --> pick greedily
+            if timestamp <= self.time_end:
 
+                if len(game_tree[s_now]['a']) > 0 and s_now in game_tree: #meaning we know the Q values, --> pick greedily
                     Q = []
                     actions = []
                     for a in game_tree[s_now]['a']:
@@ -543,8 +543,6 @@ class Solver(object):
 
             else: #well, use the rollout policy then
                 finished = True
-                if s_now not in game_tree:
-                    print('failed because we found unidentified state!')
 
     # one MCTS rollout
     def _one_MCT_rollout_and_backup(self, game_tree, s_0):
@@ -746,19 +744,19 @@ class Solver(object):
         if 'asks' in actions_dict and net_load < 0 and 'quantity' in self.actions:
             ask_quant = -net_load
             offset = self.actions['quantity'] - ask_quant
-            offset[offset < 0] = np.inf
+            offset[offset > 0] = np.inf
             quant_index = np.argmin(offset)
             # find the quantity in the actiosn dictionary that is closest below the desired number
         elif 'bids' in actions_dict and net_load > 0 and 'quantity' in self.actions:
             bid_quant = net_load
             offset = self.actions['quantity'] - bid_quant
-            offset[offset < 0] = np.inf
+            offset[offset > 0] = np.inf
             quant_index = np.argmin(offset)
             # find the quantity in the actiosn dictionary that is closest below the desired number
         else:
             quant = 0
             offset = self.actions['quantity'] - quant
-            offset[offset < 0] = np.inf
+            offset[offset > 0] = np.inf
             quant_index = np.argmin(offset)
 
         return quant_index

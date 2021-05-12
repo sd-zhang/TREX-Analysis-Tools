@@ -49,7 +49,7 @@ class Solver(object):
                  sim_db_path='postgresql://postgres:postgres@localhost/ae2021-ute3-qbandit-anneal-lr-exp-5s-5d',
                  sim_type='training',
                  start_gen=0, # the generation we import the game-tree from, shouldn't make a difference but might be useful down the line
-                 test_scenario='battery', #None, 'variable', 'fixed', 'battery'
+                 test_scenario='fixed', #None, 'variable', 'fixed', 'battery'
                  test_length = 16, #in steps
                  test_participants = 8,
                  ):
@@ -77,7 +77,6 @@ class Solver(object):
         max_price = min_price * (1 + exp_config['data']['market']['grid']['fee_ratio'])
         self.prices_max_min = (max_price, min_price)
         self.battery_capacity = 7000
-        # ToDO: battery import & setup here?
         self.EES = Storage()
 
         # update the game tree to the test scenario
@@ -238,7 +237,6 @@ class Solver(object):
                 self.participants_dict[participant]['metrics'].at[idx, 'actions_dict'] = actions_dict
 
             elif scenario == 'battery':
-                # ToDO: Find a home for the battery action in self.participants_dict[participant]['metrics'].at[idx, '???']
                 if 'battery' not in self.participants_dict[participant]['metrics']['actions_dict']:
                     self.participants_dict[participant]['metrics']['actions_dict']['battery'] = [None]*steps
                 if 'battery_SoC' not in self.participants_dict[participant]['metrics']['actions_dict']:
@@ -297,8 +295,6 @@ class Solver(object):
             if entry is not None:
                 market_ledger.append(entry)
 
-        # ToDo: reimplement battery evaluation here, this might have worked half a year ago, lol
-        # ToDO: we need access to start_energy [0 ... max_energy] and a target_action [-max_energy, max_energy]
         if 'battery' in self.participants_dict[learning_participant]['metrics']['actions_dict'][row]:
             if row == 0:
                 bat_SoC_start = 0
@@ -383,8 +379,8 @@ class Solver(object):
 
     # run MCTS for every agent in the game tree...
     def MA_MCTS(self,
-                generations = 1,
-                max_it_per_gen=8000,
+                generations = 30,
+                max_it_per_gen=5000,
                 action_space = {'battery': 3,
                                 'quantity': 8,
                                 'price': 8}, # action space might be better as a dict?
@@ -416,8 +412,8 @@ class Solver(object):
     # one single pass of MCTS for one  learner
     def MCTS(self, max_it=5000,
              action_space={'battery': 8,
-                                'quantity': 8,
-                                'price': 8}, # action space might be better as a dict?
+                           'quantity': 8,
+                           'price': 8}, # action space might be better as a dict?
              c_adjustment=1,
              learner=None):
 
@@ -427,16 +423,18 @@ class Solver(object):
         else:
             self.learner = learner
 
-        if self.test_scenario == 'battery':
-            self.actions = {'battery': np.linspace(20, -20, action_space['battery'])}
+        self.actions = {}
+        if 'battery' in self.test_scenario:
+            self.actions['battery'] = np.linspace(20, -20, action_space['battery'])
             # print(self.actions['battery'])
-        elif self.test_scenario == 'variable' or self.test_scenario == 'fixed' :
-            self.actions = {'price': np.linspace(self.prices_max_min[1], self.prices_max_min[0], action_space['price']),
-                            'quantity': np.linspace(0, 30, action_space['quantity'])
-                            }
+        elif ('variable' in self.test_scenario) or ('fixed' in self.test_scenario):
+            self.actions['price'] = np.linspace(self.prices_max_min[1], self.prices_max_min[0], action_space['price'])
+            self.actions['quantity'] = np.linspace(0, 30, action_space['quantity'])
+
         self.shape_action_space = []
         for action_dimension in self.actions:
             self.shape_action_space.append(len(self.actions[action_dimension]))
+
         # determine the size of the action space, I am sure this can be done better
         # ToDo: more elegant way of determining this pls
         num_individual_entries = 1
@@ -466,7 +464,7 @@ class Solver(object):
         # the actual MCTS part
         it = 0
         while it < max_it:
-            game_tree = self._one_MCT_rollout_and_backup(game_tree, s_0, self.linear_action_space)
+            game_tree = self._one_MCT_rollout_and_backup(game_tree, s_0)
             it += 1
 
         return game_tree, s_0, action_space
@@ -517,9 +515,9 @@ class Solver(object):
         s_now = s_0
         while not finished:
             timestamp, _ = self.decode_states(s_now)
-            if timestamp <= self.time_end and s_now in game_tree:
-                if len(game_tree[s_now]['a']) > 0: #meaning we know the Q values, --> pick greedily
+            if timestamp <= self.time_end:
 
+                if len(game_tree[s_now]['a']) > 0 and s_now in game_tree: #meaning we know the Q values, --> pick greedily
                     Q = []
                     actions = []
                     for a in game_tree[s_now]['a']:
@@ -539,24 +537,15 @@ class Solver(object):
                 else: #well, use the rollout policy then
                     print('using rollout because we found a leaf node, maybe adjust c_ubc or num_it')
                     print(s_now)
-                    _, s_now, a_state, finished = self.one_default_step(s_now, action_space=action_space)
+                    _, s_now, a_state, finished = self.one_default_step(s_now)
 
-                row = self.participants_dict[participant]['metrics'].index[
-                    self.participants_dict[participant]['metrics']['timestamp'] == timestamp]
-                row = row[0]
-                action_types = [action for action in
-                                self.participants_dict[participant]['metrics'].at[row, 'actions_dict']]
-                actions = self.decode_actions(a_state, timestamp, action_types, do_print=True)
-
-                self.participants_dict[participant]['metrics'].at[row, 'actions_dict'] = actions
+                self.decode_actions(a_state, timestamp, do_print=True)
 
             else: #well, use the rollout policy then
                 finished = True
-                if s_now not in game_tree:
-                    print('failed because we found unidentified state!')
 
     # one MCTS rollout
-    def _one_MCT_rollout_and_backup(self, game_tree, s_0, action_space):
+    def _one_MCT_rollout_and_backup(self, game_tree, s_0):
         s_now = s_0
         action = None
         trajectory = []
@@ -565,7 +554,7 @@ class Solver(object):
         # we're traversing the tree till we hit bottom
         while not finished:
             trajectory.append((s_now, action))
-            game_tree, s_now, action, finished = self._one_MCTS_step(game_tree, s_now, action_space)
+            game_tree, s_now, action, finished = self._one_MCTS_step(game_tree, s_now)
 
         game_tree = self.bootstrap_values(trajectory, game_tree)
 
@@ -624,15 +613,18 @@ class Solver(object):
         s_next = (t_next, SoC)
         return s_next
     # decode actions, placeholder function for more complex action spaces
-    def decode_actions(self, a, ts, action_types, do_print=False):
+    def decode_actions(self, a, timestamp, do_print=False):
         # ToDo: figure out better way to unwarp actions, maybe a dict again?
+        row = self.participants_dict[self.learner]['metrics'].index[self.participants_dict[self.learner]['metrics']['timestamp'] == timestamp]
+        row = row[0]
 
-        actions_dict = {}
+        actions_dict = self.participants_dict[self.learner]['metrics'].at[row, 'actions_dict']
         a = np.unravel_index(int(a), self.shape_action_space)
-        # print(price)
-        for action_type in action_types:
+
+        for action_type in actions_dict:
             if (action_type == 'bids' or action_type == 'asks') and (self.test_scenario=='fixed' or self.test_scenario=='variable'):
-                actions_dict[action_types[0]] = {str((ts+60, ts+2*60)):
+                # ToDO: change this to sth more elegant, otherwise we won't have full flexibility here in terms of what actions the agent can do
+                actions_dict[action_type] = {str((timestamp+60, timestamp+2*60)):
                                                 {'quantity': self.actions['quantity'][a[1]],
                                                 'price': self.actions['price'][a[0]],
                                                 'source': 'solar',
@@ -640,8 +632,10 @@ class Solver(object):
                                                 }
                                             }
             elif action_type == 'battery':
-                actions_dict['battery'] = {'target_flux': self.actions['battery'][a[-1]]}
-        return actions_dict
+                actions_dict['battery']['target_flux'] = self.actions['battery'][a[-1]]
+
+        self.participants_dict[self.learner]['metrics'].at[row, 'actions_dict'] = actions_dict
+        return row
 
     # figure out the reward/weight of one transition
     def evaluate_transition(self, s_now, a):
@@ -649,14 +643,10 @@ class Solver(object):
         timestamp, _ = self.decode_states(s_now) # _ being a placeholder for now
 
         #find the appropriate row in the dataframee
-        row = self.participants_dict[self.learner]['metrics'].index[self.participants_dict[self.learner]['metrics']['timestamp'] == timestamp]
-        row = row[0]
-        #ToDO: change this to sth more elegant, otherwise we won't have full flexibility here in terms of what actions the agent can do
-        action_types = [action for action in self.participants_dict[self.learner]['metrics'].at[row, 'actions_dict']]
+
         # print('before: ')
         # print(self.participants_dict[self.learner]['metrics'].at[row, 'actions_dict'])
-        actions = self.decode_actions(a, timestamp, action_types)
-        self.participants_dict[self.learner]['metrics'].at[row, 'actions_dict'] =  actions  # update the actions dictionary
+        row = self.decode_actions(a, timestamp)
         # print('after: ')
         # print(self.participants_dict[self.learner]['metrics'].at[row, 'actions_dict'])
         # print(self.participants_dict[self.learner]['metrics']['actions_dict'][row])
@@ -674,13 +664,13 @@ class Solver(object):
         return s_next
 
     # a single step of MCTS, one node evaluation
-    def _one_MCTS_step(self, game_tree, s_now, action_space):
+    def _one_MCTS_step(self, game_tree, s_now):
         #see if wee are in a leaf node
         finished = False
 
         # check of leaf node, if leaf node then do rollout, estimate V of node
         if 'a' not in game_tree[s_now]:
-            game_tree[s_now]['V'] = self.default_rollout(s_now, action_space)
+            game_tree[s_now]['V'] = self.default_rollout(s_now)
             game_tree[s_now]['a'] = {}
             game_tree[s_now]['N'] += 0
 
@@ -712,19 +702,6 @@ class Solver(object):
                  finished = True
 
         return game_tree, s_next, a, finished
-            # else:
-            #
-            #     r, s_next = self.evaluate_transition(s_now, a)
-            #
-            #     game_tree[s_now]['a'][a]['r'] = r
-            #    game_tree[s_now]['a'][a]['s_next'] = s_next
-            #     game_tree[s_now]['a'][a]['n'] +=1
-            #     game_tree[s_now]['N'] += 1
-            #     ts_now, _ = self.decode_states(s_now)
-            #     if ts_now >= self.time_end:
-            #         finished = True
-            #
-            #     return game_tree, s_next, finished
 
     # add to the game tree
     def __add_s_next(self, game_tree, s_now, action_space):
@@ -748,21 +725,93 @@ class Solver(object):
     # here's the two policies that we'll be using for now:
     # UCB for the tree traversal
     # random action selection for rollouts
-    def one_default_step(self, s_now, action_space):
-        finished = False
-        a = np.random.choice(action_space)
-        ts, _ = self.decode_states(s_now)
+    def _rollout_battery_action(self, net_load):
+        # find action that resembles greedy battery management
+        #ToDO: consider SoC as well!!
+        offset = self.actions['battery'] + net_load
+        if net_load < 0:  # we want to charge the  battery
+            offset[offset < 0] = np.inf
+            index_bat_target_flux = np.argmin(offset)
+        else:
+            offset[offset > 0] = np.inf
+            index_bat_target_flux = np.argmin(offset)
+        battery_target_flux = self.actions['battery'][index_bat_target_flux]
+
+        net_load_post_battery = net_load + battery_target_flux
+        return index_bat_target_flux, net_load
+
+    def _rollout_quantity_action(self, net_load, actions_dict):
+        if 'asks' in actions_dict and net_load < 0 and 'quantity' in self.actions:
+            ask_quant = -net_load
+            offset = self.actions['quantity'] - ask_quant
+            offset[offset > 0] = np.inf
+            quant_index = np.argmin(offset)
+            # find the quantity in the actiosn dictionary that is closest below the desired number
+        elif 'bids' in actions_dict and net_load > 0 and 'quantity' in self.actions:
+            bid_quant = net_load
+            offset = self.actions['quantity'] - bid_quant
+            offset[offset > 0] = np.inf
+            quant_index = np.argmin(offset)
+            # find the quantity in the actiosn dictionary that is closest below the desired number
+        else:
+            quant = 0
+            offset = self.actions['quantity'] - quant
+            offset[offset > 0] = np.inf
+            quant_index = np.argmin(offset)
+
+        return quant_index
+
+    def one_default_step(self, s_now):
+
+        a = np.random.choice(self.linear_action_space)
+        # ToDo how do we replace this with a better default policy?
+        # if battery in actions:  we should use greedy battery policy
+        # if market interaction the quantity should be the residual load to this
+        timestamp, _ = self.decode_states(s_now)
+
+        row = self.participants_dict[self.learner]['metrics'].index[self.participants_dict[self.learner]['metrics']['timestamp'] == timestamp]
+        row = row[0]
+        gen = self.participants_dict[self.learner]['metrics'].at[row, 'next_settle_generation']
+        load = self.participants_dict[self.learner]['metrics'].at[row, 'next_settle_load']
+        net_load = load - gen
+        if 'battery' in self.actions:
+            index_bat_action, net_load = self._rollout_battery_action(net_load)
+
+        if 'quantity' in self.actions:
+            quantity_index = self._rollout_quantity_action(net_load,
+                                                           self.participants_dict[self.learner]['metrics'].at[row, 'actions_dict'],
+                                                           )
+
+        if 'price' in self.actions:
+            price_index = np.random.choice(len(self.actions['price']))
+            price_index = int(len(self.actions['price'])/2)
+
+
+        action_indices = []
+        for key in self.actions:
+            if key == 'battery':
+                action_indices.append(index_bat_action)
+            if key == 'quantity':
+                action_indices.append(quantity_index)
+            if key == 'price':
+                action_indices.append(price_index)
+
+
+        a = np.ravel_multi_index(action_indices, self.shape_action_space)
         r, s_next = self.evaluate_transition(s_now, a)
-        if ts == self.time_end:
+
+        if timestamp == self.time_end:
             finished = True
+        else:
+            finished = False
 
         return r, s_next, a, finished
 
-    def default_rollout(self, s_now, action_space):
+    def default_rollout(self, s_now):
         finished = False
         V = 0
         while not finished:
-            r, s_next, _, finished = self.one_default_step(s_now, action_space)
+            r, s_next, _, finished = self.one_default_step(s_now)
             s_now = s_next
             V += r
 

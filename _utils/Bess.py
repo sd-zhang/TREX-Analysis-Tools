@@ -29,7 +29,7 @@ class Storage:
 
     """
 
-    def __init__(self, capacity=7000, power=3300):
+    def __init__(self, capacity=7000, power=3300, **kwargs):
         # assume perfect efficiency
         self.__info = {
             'capacity': capacity,  # Wh

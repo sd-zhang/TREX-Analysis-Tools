@@ -1,13 +1,27 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-class plotter():
+# plots the log
+class log_plotter():
 
-    def __init__(self):
+    def __init__(self, log):
+        self.log = log
 
-
-    def plot_metrics(self):
+    def plot_returns(self, export=False):
+        # calculattes and plots returns
+        # optionally exports the plot as png for use externally
         return False
 
-    def plot_transactions(self):
+    def plot_quantities(self, export=False):
+        # calculattes and plots quantities
+        # optionally exports the plot as png for use externally
+
+        return False
+
+    def plot_prices(self, export=False):
+        # calculates and plots prices
+        # optionally exports the plot as png for use externally
+        return False
+
+    def __export_plot(self, fig):
         return False

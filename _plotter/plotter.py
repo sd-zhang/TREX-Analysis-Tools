@@ -8,19 +8,46 @@ class log_plotter():
         self.log = log
 
     def plot_returns(self, export=False):
+
+        g_fig, g_ax = plt.subplots()
+        g_ax.set_xlabel('Generations')
+        g_ax.set_ylabel('Return')
+        for participant in self.log:
+            g_ax.plot(self.log[participant]['G'], label=participant)
+
+        g_fig.legend()
+        g_fig.show()
         # calculattes and plots returns
         # optionally exports the plot as png for use externally
         return False
 
     def plot_quantities(self, export=False):
+        quant_fig, quant_ax = plt.subplots()
+        quant_ax.set_xlabel('Generations')
+        quant_ax.set_ylabel('Settled kWh')
+        for participant in self.log:
+            quant_ax.plot(self.log[participant]['quant'], label=participant)
+
+        quant_fig.legend()
+        quant_fig.show()
         # calculattes and plots quantities
         # optionally exports the plot as png for use externally
-
         return False
 
     def plot_prices(self, export=False):
-        # calculates and plots prices
-        # optionally exports the plot as png for use externally
+        price_fig, (bid_ax, ask_ax) = plt.subplots(2, 1, sharex=True)
+        bid_ax.set_xlabel('Generations')
+        bid_ax.set_ylabel('Bid Prices')
+        ask_ax.set_ylabel('Ask Prices')
+        for participant in self.log:
+            bids = self.log[participant]['avg_prices']['avg_bid_price']
+            bid_ax.plot(bids, label=participant)
+
+            asks = self.log[participant]['avg_prices']['avg_ask_price']
+            ask_ax.plot(asks)
+
+        price_fig.legend()
+        price_fig.show()
         return False
 
     def __export_plot(self, fig):

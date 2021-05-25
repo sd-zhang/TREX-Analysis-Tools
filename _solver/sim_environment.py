@@ -18,9 +18,11 @@ class SimulationEnvironment:
             self.__setup_profiles(participant)
             self.__setup_storage(participant)
             self.__setup_actions(participant)
+            # self.__setup_metrics(participant)
 
     def __get_config(self, config_name: str,):
         config_file = '_configs/' + config_name + '.json'
+        # config_file = 'E:/TREX-Analysis-Tools/_configs/TB3C.json'
         with open(config_file) as f:
             config = commentjson.load(f)
         return config
@@ -43,6 +45,8 @@ class SimulationEnvironment:
         # hard code actions for now. Future versions will utilize config file.
         actions['price'] = np.linspace(trader['bid_price'], trader['ask_price'], 10)
         actions['quantity'] = np.linspace(10, 30, 30)
+        if 'storage' in self.participants[participant]:
+            actions['battery'] = np.array(([-20, 0, 20]))
 
     def __setup_storage(self, participant):
         # convert storage params to Storage object
@@ -50,9 +54,13 @@ class SimulationEnvironment:
             params = self.participants[participant]['storage']
             self.participants[participant]['storage'] = Storage(**params)
 
-    # may be optional if soc is stored in game tree?
-    # def __setup_metrics(self, participant):
-    #     self.participants[participant]['metrics'] = {}
-    #     metrics = self.participants[participant]['metrics']
-    #     if 'storage' in self.participants[participant]:
-    #         metrics['soc'] = {}
+    def __setup_metrics(self, participant):
+        self.participants[participant]['metrics'] = {}
+        metrics = self.participants[participant]['metrics']
+        # format= {'(timestamp_open, timestamp_close)':
+        #               'quantity: nbr,
+        #               'price': nbr2
+        #               'source': string ('solar')
+        #               'participant_id': learner
+        # if 'storage' in self.participants[participant]:
+        #     metrics['soc'] = {}

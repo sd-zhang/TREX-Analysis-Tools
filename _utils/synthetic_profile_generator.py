@@ -53,7 +53,7 @@ time_offset = int(1440/2)
 timestamps, energy_profile = generate_flat_profile(start_time, end_time, timezone, 1000)
 
 write_to_db(timestamps, energy_profile,
-            'postgresql://postgres:postgres@localhost/profiles',
+            'postgresql://postgres:postgres@stargate/profiles',
             'test_profile_1kw_flat')
 
 # plt.plot(timestamps, energy_profile)

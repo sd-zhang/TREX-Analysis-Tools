@@ -37,11 +37,6 @@ def _add_metrics_to_participants(participants_dict, extractor, start_gen, sim_ty
 #       - Action space: quantized sell and buy prices
 #       - Learning domains: each agent can ATM only sell or buy
 
-# ToDo I: Implement &test batteries
-    # ToDo 1a: Debug & reimplement battery
-    # ToDo 1b: Implement a single player load-shift test to verify MCTS can learn battery
-    # ToDo 2b: Implement a multi player test with several sellers and buyers with battery (so each has sell/buy + battery as actions)
-# ToDo II: implement selling AND buying
 # ToDo III: Run large scale experiment?
 
 class Solver(object):
@@ -119,7 +114,6 @@ class Solver(object):
 
             self.participants_dict[participant]['metrics'] = self.participants_dict[participant]['metrics'][:test_length]
 
-        #ToDo: optional if if we want to have other types of profiles!
         self._set_up_flat_pseudo_profiles(test_length=test_length, test_scenario=test_scenario)
 
         print(self.participants_dict[participant]['metrics'].columns)
@@ -228,6 +222,7 @@ class Solver(object):
                     price = np.random.choice([0.05, 0.1, 0.15])
 
                 actions_dict[action_type] = {ts_actions_list[idx]:
+
                                         {'quantity': quantity,
                                          'source': 'solar', #ToDo: this might be changing in the future!
                                          'price': price,
@@ -763,7 +758,6 @@ class Solver(object):
 
     def one_default_step(self, s_now):
 
-        a = np.random.choice(self.linear_action_space)
         # ToDo how do we replace this with a better default policy?
         # if battery in actions:  we should use greedy battery policy
         # if market interaction the quantity should be the residual load to this

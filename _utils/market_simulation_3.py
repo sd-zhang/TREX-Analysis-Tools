@@ -6,7 +6,7 @@ import copy
 
 # pretend market settlement
 # simulated market for participants, giving back learning agent's settlements, optionally for a specific timestamp
-def sim_market(participants:dict, learning_agent_id:str, row:int=None):
+def sim_market(participants:dict, learning_agent_id:str, timestamp:int=None):
     learning_agent = participants[learning_agent_id]
     # opponents = copy.deepcopy(participants)
     # opponents.pop(learning_agent_id, None)
@@ -14,14 +14,14 @@ def sim_market(participants:dict, learning_agent_id:str, row:int=None):
     open = {}
     learning_agent_times_delivery = []
     market_sim_df = []
-    if row == None:
-        row = range(len(learning_agent['metrics']['actions_dict']))
+    if timestamp == None:
+        timestamps = participants[learning_agent_id]['metrics'].keys()
     else:
-        row = [row]
+        timestamps = [timestamp]
     # print(row)
-    for idx in row:
+    for ts in timestamps:
         for participant_id in participants:
-            agent_actions = participants[participant_id]['metrics']['actions_dict'][idx]
+            agent_actions = participants[participant_id]['metrics'][ts]
             # print(agent_actions)
             for action in ('bids', 'asks'):
                 if action in agent_actions:
@@ -40,6 +40,7 @@ def sim_market(participants:dict, learning_agent_id:str, row:int=None):
 
     for t_d in learning_agent_times_delivery:
         # print(open[t_d])
+        # t_d = '(1530428400, 1530428520)'
         if 'bids' in open[t_d] and 'asks' in open[t_d]:
             market_sim_df.extend(match(open[t_d]['bids'], open[t_d]['asks'], 'solar', t_d))
 

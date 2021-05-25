@@ -11,7 +11,6 @@ from _utils.market_simulation_3 import sim_market, _test_settlement_process, _ma
 
 import matplotlib.pyplot as plt
 # ----------------------------------------------------------------------------------------------------------------------
-# ToDo: think about changing timestamp in state to the same timestamp format used in metrics
 class Solver():
     def __init__(self, config_name, battery=True, constant_load=True):
         self.simulation_env = SimulationEnvironment(config_name)
@@ -61,7 +60,6 @@ class Solver():
 
         return None
     # get the market settlement for one specific row for one specific agent from self.simulation_env.participants
-    # ToDo: replace row back with timestep again, lol
     def _query_market_get_reward_for_one_tuple(self, timestamp, learning_participant,
                                                do_print=False,  # idiot debug flag
                                                ):
@@ -81,22 +79,19 @@ class Solver():
                 market_ledger.append(entry)
         # ToDO: test if market is actually doing the right thing
 
-        # ToDo: reimplement battery evaluation here, this might have worked half a year ago, lol
-        # ToDO: we need access to start_energy [0 ... max_energy] and a target_action [-max_energy, max_energy]
+        # we need access to start_energy [0 ... max_energy] and a target_action [-max_energy, max_energy]
         if 'battery' in participants[learning_participant]['metrics'][timestamp]:
-            if timestamp == self.time_start:
+            if timestamp == self.time_start: #FixMe: Apparently Daniel fucked up time here somehow, the very first row of Metrics never gets updated to a real SoC
                 bat_SoC_start = 0
             else:
-                #ToDo: be cleaner and get the previos state? dunno, this seems to work as ell
-                if timestamp-60 not in participants[learning_participant]['metrics']:
+                if timestamp-60 not in participants[learning_participant]['metrics']: # FixMe: catch for general shit
                     print('missing ts!!')
                 bat_SoC_start = participants[learning_participant]['metrics'][timestamp-60]['battery']['battery_SoC']
 
             bat_target_flux = participants[learning_participant]['metrics'][timestamp]['battery']['target_flux']
 
             # seems like this is error prone somehow?!
-            # toDo, catch and fix, hhappens last timestammp apparently sometimes
-            if bat_SoC_start == None:
+            if bat_SoC_start == None: # toDo: catch and fix, once this area is debugged get rid
                 print('aha, need to debug')
                 bat_SoC_start = 0
             bat_real_flux, bat_SoC_post = self.simulation_env.participants[self.learner]['storage'].simulate_activity(start_energy=bat_SoC_start, target_energy=bat_target_flux)
@@ -129,11 +124,11 @@ class Solver():
         return rewards, quantity, avg_prices
 
     # helper for _query_market_get_reward_for_one_tuple, to see what we get or put into grid
+    # ToDo: check here to make sure this is right
     def _extract_grid_transactions(self, market_ledger, learning_participant, timestamp, battery=0.0):
         sucessfull_bids = sum([sett[1] for sett in market_ledger if sett[0] == 'bid'])
         sucessfull_asks = sum([sett[1] for sett in market_ledger if sett[0] == 'ask'])
 
-        #ToDo: check if this still does what its supposed to be
         net_influx = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['gen'] - sucessfull_asks
         net_outflux = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['load'] - sucessfull_bids
 
@@ -147,8 +142,7 @@ class Solver():
         G = 0
         quant_cum = 0
         avg_prices = {}
-        timestamps = [ts for ts in self.simulation_env.participants[participant]['metrics']]
-        timestamps.sort()
+        timestamps = np.arange(self.time_start, self.time_end, 60)
         for timestamp in timestamps:
 
             r, quant, avg_price_row = self._query_market_get_reward_for_one_tuple(timestamp, participant, True)
@@ -178,7 +172,7 @@ class Solver():
     # run MCTS for every agent in the game tree...
     def MA_MCTS(self,
                 generations = 1,
-                max_it_per_gen=2,
+                max_it_per_gen=1,
                 action_space = {'battery': 3,
                                 'quantity': 8,
                                 'price': 8}, # action space might be better as a dict?
@@ -229,7 +223,7 @@ class Solver():
         for action_dimension in self.simulation_env.participants[self.learner]['trader']['actions']:
             self.shape_action_space.append(len(self.simulation_env.participants[self.learner]['trader']['actions'][action_dimension]))
         # determine the size of the action space, I am sure this can be done better
-        # ToDo: more elegant way of determining this pls
+
         num_individual_entries = 1
         for dimension in self.shape_action_space:
             num_individual_entries = num_individual_entries*dimension
@@ -264,7 +258,6 @@ class Solver():
         return game_tree, s_0, action_space
 
     # this update the policy from game tree and evaluate the policy
-    # ToDO: better name, seems conflicting with _update_policy_from_tree
     def _update_policies_and_evaluate(self, game_trees, s_0s, action_spaces, measurment_dict):
 
         for participant in self.simulation_env.participants:
@@ -302,7 +295,6 @@ class Solver():
         return measurment_dict
 
     # update the policy from the game tree
-    # ToDo: policy
     def _update_policy_from_tree(self, participant, game_tree, s_0, action_space):
         # the idea is to follow a greedy policy from S_0 as long as we can and then switch over to the default rollout policy
         finished = False
@@ -358,7 +350,6 @@ class Solver():
         return game_tree
 
     # backprop of values
-    # ToDo: Fix the trajectory
     def bootstrap_values(self, trajectory, game_tree):
         # now we backpropagate the value up the tree:
         if len(trajectory) > 1:
@@ -407,7 +398,6 @@ class Solver():
         return s_next
     # decode actions, placeholder function for more complex action spaces
     def decode_actions(self, a, ts, action_types, do_print=False):
-        # ToDo: figure out better way to unwarp actions, maybe a dict again?
 
         actions_dict = self.simulation_env.participants[self.learner]['metrics'][ts]
         a = np.unravel_index(int(a), self.shape_action_space)
@@ -434,7 +424,7 @@ class Solver():
         #find the appropriate row in the dataframee
         # row = self.simulation_env.participants[self.learner]['metrics'].index[self.simulation_env.participants[self.learner]['metrics']['timestamp'] == timestamp]
         # row = row[0]
-        #ToDO: change this to sth more elegant, otherwise we won't have full flexibility here in terms of what actions the agent can do
+
         action_types = [action for action in self.simulation_env.participants[self.learner]['metrics'][timestamp]]
         # print('before: ')
         # print(self.simulation_env.participants[self.learner]['metrics'].at[row, 'actions_dict'])
@@ -448,8 +438,7 @@ class Solver():
         # print(r)
         return r, s_next
 
-    # determine the next state
-    # ToDO: this will have to change with batteries!
+    # determine the next stat
     def _next_states(self, s_now, a):
         t_now = s_now[0]
         s_next = self.encode_states(time=t_now)

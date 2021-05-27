@@ -94,6 +94,9 @@ class Solver():
             if bat_SoC_start == None: # toDo: catch and fix, once this area is debugged get rid
                 print('aha, need to debug')
                 bat_SoC_start = 0
+            if bat_target_flux == None:
+                bat_target_flux = 0
+
             bat_real_flux, bat_SoC_post = self.simulation_env.participants[self.learner]['storage'].simulate_activity(start_energy=bat_SoC_start, target_energy=bat_target_flux)
 
             self.simulation_env.participants[learning_participant]['metrics'][timestamp]['battery']['battery_SoC'] = bat_SoC_post
@@ -171,7 +174,7 @@ class Solver():
 
     # run MCTS for every agent in the game tree...
     def MA_MCTS(self,
-                generations = 1,
+                generations = 2,
                 max_it_per_gen=1,
                 action_space = {'battery': 3,
                                 'quantity': 8,
@@ -193,10 +196,6 @@ class Solver():
                 game_trees[participant], s_0s[participant], action_spaces[participant] = self.MCTS(max_it_per_gen, action_space, c_adjustment, learner=participant)
 
             log = self._update_policies_and_evaluate(game_trees, s_0s, action_spaces, log)
-        if self.test_scenario == 'fixed' or self.test_scenario == 'variable':
-            self._plot_log(log)
-        else:
-            self._plot_battery()
 
         return log, game_trees, self.simulation_env.participants
 
@@ -574,5 +573,9 @@ class Solver():
 if __name__ == '__main__':
     solver = Solver('TB3C', battery=True, constant_load=True)
     log, game_trees, participants_dict = solver.MA_MCTS()
+    plotter = log_plotter(log)
+    plotter.plot_prices()
+    plotter.plot_quantities()
+    plotter.plot_returns()
     log_plotter(log)
     print('fin')

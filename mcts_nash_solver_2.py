@@ -6,19 +6,19 @@ import numpy as np
 import _utils.market_simulation_3 as market
 from _plotter.plotter import log_plotter
 from _utils.rewards_proxy import NetProfit_Reward as Reward
-from _utils.utils import process_profile
+from _utils.utils import process_profile, secure_random
 from _utils.market_simulation_3 import sim_market, _test_settlement_process, _map_market_to_ledger
 
 import matplotlib.pyplot as plt
 # ----------------------------------------------------------------------------------------------------------------------
 class Solver():
-    def __init__(self, config_name, battery=True, constant_load=True):
+    def __init__(self, config_name, constant_load=True):
         self.simulation_env = SimulationEnvironment(config_name)
         self.reward = Reward()
         for participant in self.simulation_env.participants:
-            self.__setup_initial_actions(participant, battery)
+            self.__setup_initial_actions(participant)
 
-    def __setup_initial_actions(self, participant, battery):
+    def __setup_initial_actions(self, participant):
         self.simulation_env.participants[participant]['metrics'] = {}
         metrics = self.simulation_env.participants[participant]['metrics']
         # format= {'(timestamp_open, timestamp_close)':
@@ -29,22 +29,23 @@ class Solver():
 
         # for loop something
         for row in self.simulation_env.participants[participant]['profile']:
-            gen, consumption = process_profile(row,
+            generation, consumption = process_profile(row,
                             gen_scale=self.simulation_env.participants[participant]['generation']['scale'],
                             load_scale=self.simulation_env.participants[participant]['load']['scale'])
-            row['gen'] = gen
-            row['load'] = consumption
-            net_load = consumption - gen
+
+            # row['gen'] = gen
+            # row['load'] = consumption
+            net_load = consumption - generation
             t_start = row['tstamp'] - 60
             t_end = row['tstamp']
 
             if net_load > 0:
-                action_type = 'asks'
-            else:
                 action_type = 'bids'
+            else:
+                action_type = 'asks'
 
             metrics[t_start] = {action_type:
-                                    {str((t_start, t_end+60)):
+                                    {str((t_start, t_end)):
                                          {'quantity': abs(net_load),
                                          'price': np.random.choice(self.simulation_env.participants[participant]['trader']['actions']['price']),
                                          'source': 'solar',
@@ -52,10 +53,10 @@ class Solver():
                                          },
                                      }
                                 }
-            if battery:
+            if 'storage' in self.simulation_env.participants[participant]:
                 metrics[t_start]['battery'] = {'battery_SoC': None, 'target_flux': None}
 
-            metrics[t_start]['gen'] = gen
+            metrics[t_start]['gen'] = generation
             metrics[t_start]['load'] = consumption
 
         return None
@@ -69,14 +70,21 @@ class Solver():
         market_df = sim_market(participants=participants,
                                learning_agent_id=learning_participant,
                                timestamp=timestamp)
+
         market_ledger = []
         quantity = 0
+
         for index in range(market_df.shape[0]):
             settlement = market_df.iloc[index]
             quantity = settlement['quantity']
             entry = _map_market_to_ledger(settlement, learning_participant, do_print)
             if entry is not None:
                 market_ledger.append(entry)
+        # if market_ledger:
+        #     print(market_ledger)
+
+        # if quantity:
+        #     print(quantity)
         # ToDO: test if market is actually doing the right thing
 
         # we need access to start_energy [0 ... max_energy] and a target_action [-max_energy, max_energy]
@@ -113,7 +121,7 @@ class Solver():
                                                             learning_participant=learning_participant,
                                                             timestamp=timestamp,
                                                             battery=bat_real_flux)
-        # print('grid trans:', grid_transactions)
+        # print(learning_participant, 'grid trans:', grid_transactions)
 
         # then calculate the reward function
         rewards, avg_prices = self.reward.calculate(market_transactions=market_ledger,
@@ -129,16 +137,33 @@ class Solver():
     # helper for _query_market_get_reward_for_one_tuple, to see what we get or put into grid
     # ToDo: check here to make sure this is right
     def _extract_grid_transactions(self, market_ledger, learning_participant, timestamp, battery=0.0):
-        sucessfull_bids = sum([sett[1] for sett in market_ledger if sett[0] == 'bid'])
-        sucessfull_asks = sum([sett[1] for sett in market_ledger if sett[0] == 'ask'])
+        sucessful_bids = sum([sett[1] for sett in market_ledger if sett[0] == 'bid'])
+        sucessful_asks = sum([sett[1] for sett in market_ledger if sett[0] == 'ask'])
 
-        net_influx = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['gen'] - sucessfull_asks
-        net_outflux = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['load'] - sucessfull_bids
 
-        grid_load = net_outflux - net_influx + battery
-        min_price = self.simulation_env.configs['market']['grid']['price']
-        max_price = min_price * self.simulation_env.configs['market']['grid']['fee_ratio']
-        return (max(0, grid_load), max_price, max(0, -grid_load), min_price)
+        generation = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['gen']
+        consumption = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['load']
+
+        residual_consumption = consumption - sucessful_bids
+        residual_generation = generation - sucessful_asks
+        net_grid_load = residual_consumption - residual_generation
+
+        # not sure what this logically means???
+        # commented out for record keeping
+        # net_influx = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['gen'] - sucessful_asks
+        # net_outflux = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['load'] - sucessful_bids
+
+        # print(learning_participant, market_ledger)
+        # print(learning_participant, sucessful_bids, sucessful_asks)
+        # print(learning_participant, generation, consumption)
+        # print('---')
+
+        grid_load = net_grid_load + battery
+        grid_sell_price = self.simulation_env.configs['market']['grid']['price']
+        grid_buy_price = grid_sell_price * (1 + self.simulation_env.configs['market']['grid']['fee_ratio'])
+        return (max(0, grid_load), grid_buy_price, max(0, -grid_load), grid_sell_price)
+        # I think this tweak makes more logical sense?
+        # return (max(0, grid_load), max_price, min(0, grid_load), min_price)
 
     # evaluate current policy of a participant inside a game tree and collects some metrics
     def evaluate_current_policy(self, participant, do_print=True):
@@ -150,20 +175,20 @@ class Solver():
 
             r, quant, avg_price_row = self._query_market_get_reward_for_one_tuple(timestamp, participant, True)
 
-            for cathegory in avg_price_row:
-                if cathegory not in avg_prices:
-                    avg_prices[cathegory] = [avg_price_row[cathegory]]
+            for category in avg_price_row:
+                if category not in avg_prices:
+                    avg_prices[category] = [avg_price_row[category]]
                 else:
-                    avg_prices[cathegory].append(avg_price_row[cathegory])
+                    avg_prices[category].append(avg_price_row[category])
 
             G += r
             quant_cum += quant
-        for cathegory in avg_prices:
-            num_nans = np.count_nonzero(np.isnan(avg_prices[cathegory]))
-            if num_nans != len(avg_prices[cathegory]):
-                avg_prices[cathegory] = np.nanmean(avg_prices[cathegory])
+        for category in avg_prices:
+            num_nans = np.count_nonzero(np.isnan(avg_prices[category]))
+            if num_nans != len(avg_prices[category]):
+                avg_prices[category] = np.nanmean(avg_prices[category])
             else:
-                avg_prices[cathegory] = np.nan
+                avg_prices[category] = np.nan
 
 
         if do_print:
@@ -174,14 +199,10 @@ class Solver():
 
     # run MCTS for every agent in the game tree...
     def MA_MCTS(self,
-                generations = 2,
-                max_it_per_gen=1,
-                action_space = {'battery': 3,
-                                'quantity': 8,
-                                'price': 8}, # action space might be better as a dict?
+                max_it_per_gen=100,
                 c_adjustment=1):
+        generations = self.simulation_env.configs['study']['generations']
         log = {}
-
         game_trees = {}
         s_0s = {}
         action_spaces = {}
@@ -191,34 +212,43 @@ class Solver():
                                 'quant': []}
 
         for gen in range(generations):
+
             for participant in self.simulation_env.participants:
                 print('MCTS gen', gen, 'for', participant)
-                game_trees[participant], s_0s[participant], action_spaces[participant] = self.MCTS(max_it_per_gen, action_space, c_adjustment, learner=participant)
+                game_trees[participant], s_0s[participant], action_spaces[participant] = \
+                    self.MCTS(participant, max_it_per_gen, c_adjustment)
 
             log = self._update_policies_and_evaluate(game_trees, s_0s, action_spaces, log)
+        # if self.test_scenario == 'fixed' or self.test_scenario == 'variable':
+        #     self._plot_log(log)
+        # else:
+        #     self._plot_battery()
 
         return log, game_trees, self.simulation_env.participants
 
     # one single pass of MCTS for one  learner
-    def MCTS(self, max_it=5000,
-             action_space={'battery': 8,
-                           'quantity': 8,
-                           'price': 8}, # action space might be better as a dict?
-             c_adjustment=1,
-             learner=None):
+    def MCTS(self, learner,
+             max_it,
+             c_adjustment=1):
 
         # designate the target agent
-        if learner is None:
-            self.learner = list(self.simulation_env.participants.keys())[0]
-        else:
-            self.learner = learner
+        # if learner is None:
+        #     self.learner = list(self.simulation_env.participants.keys())[0]
+        # else:
+        self.learner = learner
+        print(self.learner)
 
         # elif self.test_scenario == 'variable' or self.test_scenario == 'fixed' :
         #     self.actions = {'price': np.linspace(self.prices_max_min[1], self.prices_max_min[0], action_space['price']),
         #                     'quantity': np.linspace(0, 30, action_space['quantity'])
         #                     }
+
+        action_space = {}
+        for action in self.simulation_env.participants[self.learner]['trader']['actions']:
+            action_space[action] = len(self.simulation_env.participants[self.learner]['trader']['actions'][action])
+
         self.shape_action_space = []
-        print(self.learner)
+
         for action_dimension in self.simulation_env.participants[self.learner]['trader']['actions']:
             self.shape_action_space.append(len(self.simulation_env.participants[self.learner]['trader']['actions'][action_dimension]))
         # determine the size of the action space, I am sure this can be done better
@@ -249,10 +279,8 @@ class Solver():
             # n: number of times this action was taken
 
         # the actual MCTS part
-        it = 0
-        while it < max_it:
+        for it in range(max_it):
             game_tree = self._one_MCT_rollout_and_backup(game_tree, s_0)
-            it += 1
 
         return game_tree, s_0, action_space
 
@@ -280,15 +308,15 @@ class Solver():
 
             if 'avg_prices' not in measurment_dict[participant]:
                 measurment_dict[participant]['avg_prices'] = {}
-                for cathegory in avg_prices:
-                    measurment_dict[participant]['avg_prices'][cathegory] = [avg_prices[cathegory]]
+                for category in avg_prices:
+                    measurment_dict[participant]['avg_prices'][category] = [avg_prices[category]]
             else:
-                for cathegory in avg_prices:
+                for category in avg_prices:
 
-                    if cathegory not in measurment_dict[participant]['avg_prices']:
-                        measurment_dict[participant]['avg_prices'][cathegory] = [avg_prices[cathegory]]
+                    if category not in measurment_dict[participant]['avg_prices']:
+                        measurment_dict[participant]['avg_prices'][category] = [avg_prices[category]]
                     else:
-                        measurment_dict[participant]['avg_prices'][cathegory].append(avg_prices[cathegory])
+                        measurment_dict[participant]['avg_prices'][category].append(avg_prices[category])
 
 
         return measurment_dict
@@ -397,8 +425,8 @@ class Solver():
         return s_next
     # decode actions, placeholder function for more complex action spaces
     def decode_actions(self, a, ts, action_types, do_print=False):
-
         actions_dict = self.simulation_env.participants[self.learner]['metrics'][ts]
+        # print(actions_dict)
         a = np.unravel_index(int(a), self.shape_action_space)
         # print(price)
         for action_type in action_types:
@@ -571,8 +599,8 @@ class Solver():
 
 
 if __name__ == '__main__':
-    solver = Solver('TB3C', battery=True, constant_load=True)
-    log, game_trees, participants_dict = solver.MA_MCTS()
+    solver = Solver('TB3T', constant_load=True)
+    log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=1000)
     plotter = log_plotter(log)
     plotter.plot_prices()
     plotter.plot_quantities()

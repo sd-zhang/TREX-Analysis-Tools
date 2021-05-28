@@ -12,6 +12,7 @@ def sim_market(participants:dict, learning_agent_id:str, timestamp:int=None):
     # opponents.pop(learning_agent_id, None)
     # print(learning_agent_id)
     open = {}
+
     learning_agent_times_delivery = []
     market_sim_df = []
     if timestamp == None:
@@ -37,6 +38,9 @@ def sim_market(participants:dict, learning_agent_id:str, timestamp:int=None):
                         open[time_delivery][action].append(copy.deepcopy(aa))
                         if participant_id == learning_agent_id:
                             learning_agent_times_delivery.append(time_delivery)
+
+    # if open:
+    #     print(open)
 
     for t_d in learning_agent_times_delivery:
         # print(open[t_d])
@@ -68,6 +72,7 @@ def match(bids, asks, source_type, time_delivery):
 
         # Settle highest price bids with lowest price asks
         settle_record = settle(bid, ask, time_delivery)
+        # print(settle_record)
         if settle_record:
             settled.append(settle_record)
 
@@ -173,11 +178,11 @@ def _map_market_to_ledger(market_df_ts, # one timemslice of the market dataframe
 
     if market_df_ts['seller_id'] == learning_agent or market_df_ts['buyer_id'] == learning_agent:
 
-        if (market_df_ts['seller_id'] == learning_agent) & (market_df_ts['buyer_id'] != 'grid'):
+        if learning_agent == market_df_ts['seller_id']:
             action = 'ask'
             price = market_df_ts['settlement_price_sell']
 
-        elif (market_df_ts['buyer_id'] == learning_agent) & (market_df_ts['seller_id'] != 'grid'):
+        elif learning_agent == market_df_ts['buyer_id']:
             action = 'bid'
             price = market_df_ts['settlement_price_buy']
 

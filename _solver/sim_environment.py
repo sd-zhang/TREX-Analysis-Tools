@@ -11,7 +11,10 @@ class SimulationEnvironment:
 
         study = self.configs['study']
         study['start_timestamp'] = utils.timestr_to_timestamp(study['start_datetime'], study['timezone'])
-        study['end_timestamp'] = study['start_timestamp'] + study['days'] * 1440 * 60
+        study['end_timestamp'] = study['start_timestamp'] + int(study['days'] * 1440) * 60
+
+        print((study['end_timestamp'] - study['start_timestamp'])/60, 'steps')
+
         self.participants = self.configs['participants']
 
         for participant in self.participants:
@@ -43,10 +46,14 @@ class SimulationEnvironment:
         actions = self.participants[participant]['trader']['actions']
 
         # hard code actions for now. Future versions will utilize config file.
-        actions['price'] = np.linspace(trader['bid_price'], trader['ask_price'], 10)
-        actions['quantity'] = np.linspace(10, 30, 30)
+        # actions['price'] = np.linspace(trader['bid_price'], trader['ask_price'], 10)
+        # actions['quantity'] = np.arange(10, 31)  # quantity can only be integers
+
+        actions['price'] = tuple(np.array([trader['bid_price'], trader['ask_price']]))
+        actions['quantity'] = tuple(np.array([17]))  # quantity can only be integers
+
         if 'storage' in self.participants[participant]:
-            actions['battery'] = np.array(([-20, 0, 20]))
+            actions['battery'] = tuple(np.array(([-20, 0, 20])))
 
     def __setup_storage(self, participant):
         # convert storage params to Storage object

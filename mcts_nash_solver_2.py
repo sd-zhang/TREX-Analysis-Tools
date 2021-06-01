@@ -265,7 +265,7 @@ class Solver():
 
         time_start = self.simulation_env.configs['study']['start_timestamp'] #first state of the cropped data piece
         self.time_end = self.simulation_env.configs['study']['end_timestamp'] - 60
-        s_0 = self.encode_states(time=time_start - 60)
+        s_0 = self.encode_states(participant=learner, time=time_start - 60)
         game_tree = {}
         game_tree[s_0] = {'N': 0}
         # We need a data structure to store the 'game tree'
@@ -281,7 +281,9 @@ class Solver():
 
         # the actual MCTS part
         for it in range(max_it):
-            game_tree = self._one_MCT_rollout_and_backup(game_tree, s_0)
+            game_tree = self._one_MCT_rollout_and_backup(participant=learner,
+                                                         game_tree=game_tree,
+                                                         s_0=s_0)
 
         return game_tree, s_0, action_space
 
@@ -351,7 +353,8 @@ class Solver():
                 else: #well, use the rollout policy then
                     print('using rollout because we found a leaf node, maybe adjust c_ubc or num_it')
                     print(s_now)
-                    _, s_now, a_state, finished = self.one_default_step(s_now)
+                    _, s_now, a_state, finished = self.one_default_step(participant=participant,
+                                                                        s_now=s_now)
 
                 action_types = [action for action in self.simulation_env.participants[self.learner]['metrics'][timestamp]]
                 actions = self.decode_actions(a_state, timestamp, action_types, do_print=True)
@@ -362,7 +365,7 @@ class Solver():
                     print('failed because we found unidentified state!')
 
     # one MCTS rollout
-    def _one_MCT_rollout_and_backup(self, game_tree, s_0):
+    def _one_MCT_rollout_and_backup(self, participant, game_tree, s_0):
         s_now = s_0
         action = None
         trajectory = []
@@ -371,7 +374,9 @@ class Solver():
         # we're traversing the tree till we hit bottom
         while not finished:
             trajectory.append((s_now, action))
-            game_tree, s_now, action, finished = self._one_MCTS_step(game_tree, s_now)
+            game_tree, s_now, action, finished = self._one_MCTS_step(participant=participant,
+                                                                     game_tree=game_tree,
+                                                                     s_now=s_now)
 
         game_tree = self.bootstrap_values(trajectory, game_tree)
 
@@ -410,14 +415,13 @@ class Solver():
         return timestamp, None
 
     # same as decode, but backwards...^^
-    def encode_states(self, time:int):
+    def encode_states(self, participant, time:int):
         # for now we only encode  time
-
-        if 'battery' in self.simulation_env.participants[self.learner]['trader']['actions']:
+        if 'battery' in self.simulation_env.participants[participant]['trader']['actions']:
             if time+60 <= self.time_start:
                 SoC = 0
             else:
-                SoC = self.simulation_env.participants[self.learner]['metrics'][time]['battery']['battery_SoC']
+                SoC = self.simulation_env.participants[participant]['metrics'][time]['battery']['battery_SoC']
         else:
             SoC = None
 
@@ -445,7 +449,7 @@ class Solver():
         return actions_dict
 
     # figure out the reward/weight of one transition
-    def evaluate_transition(self, s_now, a):
+    def evaluate_transition(self, participant, s_now, a):
         # for now the state tuple is: (time)
         timestamp, _ = self.decode_states(s_now) # _ being a placeholder for now
 
@@ -461,25 +465,28 @@ class Solver():
         # print(self.simulation_env.participants[self.learner]['metrics'].at[row, 'actions_dict'])
         # print(self.simulation_env.participants[self.learner]['metrics']['actions_dict'][row])
         r, _, __ = self._query_market_get_reward_for_one_tuple(timestamp, self.learner, do_print=False)
-        s_next = self.encode_states(time=timestamp)
+        s_next = self.encode_states(participant=participant,
+                                    time=timestamp)
 
         # print(r)
         return r, s_next
 
     # determine the next stat
-    def _next_states(self, s_now, a):
+    def _next_states(self, participant, s_now, a):
         t_now = s_now[0]
-        s_next = self.encode_states(time=t_now)
+        s_next = self.encode_states(participant=participant,
+                                    time=t_now)
         return s_next
 
     # a single step of MCTS, one node evaluation
-    def _one_MCTS_step(self, game_tree, s_now):
+    def _one_MCTS_step(self, participant, game_tree, s_now):
         #see if wee are in a leaf node
         finished = False
 
         # check of leaf node, if leaf node then do rollout, estimate V of node
         if 'a' not in game_tree[s_now]:
-            game_tree[s_now]['V'] = self.default_rollout(s_now)
+            game_tree[s_now]['V'] = self.default_rollout(participant=participant,
+                                                         s_now=s_now)
             game_tree[s_now]['a'] = {}
             game_tree[s_now]['N'] += 0
 
@@ -496,7 +503,9 @@ class Solver():
                                             'n': 0,
                                             's_next': None} #gotta mak sure all those get populated
 
-            r, s_next = self.evaluate_transition(s_now, a)
+            r, s_next = self.evaluate_transition(participant=participant,
+                                                 s_now=s_now,
+                                                 a=a)
             ts, _ = self.decode_states(s_next)
             game_tree[s_now]['a'][a]['r'] = r
             game_tree[s_now]['a'][a]['n'] += 1
@@ -526,11 +535,13 @@ class Solver():
             #     return game_tree, s_next, finished
 
     # add to the game tree
-    def __add_s_next(self, game_tree, s_now, action_space):
+    def __add_s_next(self, participant, game_tree, s_now, action_space):
         a_next = {}
         for action in action_space:
+            s_next = self._next_states(participant=participant,
+                                       s_now=s_now,
+                                       a=action)
 
-            s_next = self._next_states(s_now, action)
             ts, _ = self.decode_states(s_next)
             if s_next not in game_tree and ts <= self.time_end:
                 game_tree[s_next] = {'N': 0}
@@ -538,30 +549,30 @@ class Solver():
             a_next[str(action)] = {'r': None,
                               'n': 0,
                               's_next': s_next}
-
-
         game_tree[s_now]['a'] = a_next
-
         return game_tree
 
     # here's the two policies that we'll be using for now:
     # UCB for the tree traversal
     # random action selection for rollouts
-    def one_default_step(self, s_now):
+    def one_default_step(self, participant, s_now):
         finished = False
         a = np.random.choice(self.linear_action_space)
         ts, _ = self.decode_states(s_now)
-        r, s_next = self.evaluate_transition(s_now, a)
+        r, s_next = self.evaluate_transition(participant=participant,
+                                             s_now=s_now,
+                                             a=a)
         if ts == self.time_end:
             finished = True
 
         return r, s_next, a, finished
 
-    def default_rollout(self, s_now):
+    def default_rollout(self, participant, s_now):
         finished = False
         V = 0
         while not finished:
-            r, s_next, _, finished = self.one_default_step(s_now)
+            r, s_next, _, finished = self.one_default_step(participant=participant,
+                                                           s_now=s_now)
             s_now = s_next
             V += r
 

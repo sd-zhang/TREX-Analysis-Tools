@@ -177,8 +177,6 @@ class Solver():
         # for timestamp in timestamps:
         for step in profile[:-1]:
             timestamp = step['tstamp']
-            # if timestamp >= self.time_end:
-            #     break
             r, quant, avg_price_row = self._query_market_get_reward_for_one_tuple(timestamp, participant, True)
 
             for category in avg_price_row:
@@ -231,9 +229,7 @@ class Solver():
         return log, game_trees, self.simulation_env.participants
 
     # one single pass of MCTS for one  learner
-    def MCTS(self, learner,
-             max_it,
-             c_adjustment=1):
+    def MCTS(self, learner, max_it, c_adjustment=1):
 
         # designate the target agent
         # if learner is None:
@@ -248,19 +244,20 @@ class Solver():
         #                     }
 
         action_space = {}
-        for action in self.simulation_env.participants[self.learner]['trader']['actions']:
-            action_space[action] = len(self.simulation_env.participants[self.learner]['trader']['actions'][action])
-
         self.shape_action_space = []
+        actions = self.simulation_env.participants[learner]['trader']['actions']
+        for action in actions:
+            action_space[action] = len(actions[action])
+            self.shape_action_space.append(len(actions[action]))
 
-        for action_dimension in self.simulation_env.participants[self.learner]['trader']['actions']:
-            self.shape_action_space.append(len(self.simulation_env.participants[self.learner]['trader']['actions'][action_dimension]))
+        # for action_dimension in self.simulation_env.participants[learner]['trader']['actions']:
+        #     self.shape_action_space.append(len(self.simulation_env.participants[learner]['trader']['actions'][action_dimension]))
         # determine the size of the action space, I am sure this can be done better
 
         num_individual_entries = 1
         for dimension in self.shape_action_space:
             num_individual_entries = num_individual_entries*dimension
-        self.linear_action_space =  np.arange(num_individual_entries).tolist()
+        self.linear_action_space = np.arange(num_individual_entries).tolist()
 
         self.c_ucb = c_adjustment
 
@@ -268,7 +265,7 @@ class Solver():
 
         time_start = self.simulation_env.configs['study']['start_timestamp'] #first state of the cropped data piece
         self.time_end = self.simulation_env.configs['study']['end_timestamp'] - 60
-        s_0 = self.encode_states(learner, time=time_start - 60)
+        s_0 = self.encode_states(time=time_start - 60)
         game_tree = {}
         game_tree[s_0] = {'N': 0}
         # We need a data structure to store the 'game tree'
@@ -606,8 +603,8 @@ if __name__ == '__main__':
     solver = Solver('TB3T', constant_load=True)
     log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=1000)
     plotter = log_plotter(log)
-    plotter.plot_prices()
+    # plotter.plot_prices()
     plotter.plot_quantities()
-    plotter.plot_returns()
+    # plotter.plot_returns()
     log_plotter(log)
     print('fin')

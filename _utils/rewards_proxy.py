@@ -29,8 +29,9 @@ class NetProfit_Reward:
         ask_quant = sum([t[1] for t in market_transactions if t[0] == 'ask'])
         cost_quant = bid_quant + grid_transactions[0]
         profit_quant = ask_quant + grid_transactions[2]
-        avg_price_sell = total_profit/ask_quant if ask_quant > 0 else np.nan
-        avg_price_buy = total_cost/bid_quant if bid_quant > 0 else np.nan
+
+        avg_price_sell = market_profit/ask_quant if ask_quant > 0 else np.nan
+        avg_price_buy = market_cost/bid_quant if bid_quant > 0 else np.nan
 
         return reward, {'avg_ask_price': avg_price_sell, 'avg_bid_price': avg_price_buy}
 

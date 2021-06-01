@@ -211,8 +211,8 @@ class Solver():
 
     # run MCTS for every agent in the game tree...
     def MA_MCTS(self,
-                max_it_per_gen=100,
-                c_adjustment=1):
+                max_it_per_gen,
+                c_adjustment):
         generations = self.simulation_env.configs['study']['generations']
         log = {}
         game_trees = {}
@@ -240,18 +240,28 @@ class Solver():
             self.linear_action_space[participant] = np.arange(num_individual_entries).tolist()
 
         for gen in range(generations):
-            # for participant in self.simulation_env.participants:
-            #     print('MCTS gen', gen, 'for', participant)
-            #     game_trees[participant], s_0s[participant] = \
-            #         self.MCTS(participant, max_it_per_gen, c_adjustment)
+            game_trees.clear()
+            s_0s.clear()
 
-            with Parallel(n_jobs=len(self.simulation_env.participants)) as parallel:
-                results = parallel(delayed(self.MCTS)(participant, max_it_per_gen, c=c_adjustment) for
-                                   participant in self.simulation_env.participants)
-            for result in results:
-                for participant in result:
-                    game_trees[participant] = result[participant][0]
-                    s_0s[participant] = result[participant][1]
+            # serial execution code
+            for participant in self.simulation_env.participants:
+                print('MCTS gen', gen, 'for', participant)
+                result = self.mcts(learner=participant, max_it=max_it_per_gen, c=c_adjustment)
+                game_trees[participant] = result[participant]['game_tree']
+                s_0s[participant] = result[participant]['s_0']
+
+            # parallel execution code
+            # with Parallel(n_jobs=len(self.simulation_env.participants)) as parallel:
+            #     results = parallel(delayed(self.mcts)(learner=participant, max_it=max_it_per_gen, c=c_adjustment) for
+            #                        participant in self.simulation_env.participants)
+            #
+            #     print(results[0])
+            #     print(results[1])
+            #
+            # for result in results:
+            #     for participant in result:
+            #         game_trees[participant] = result[participant]['game_tree']
+            #         s_0s[participant] = result[participant]['s_0']
 
             log = self._update_policies_and_evaluate(game_trees=game_trees,
                                                      s_0s=s_0s,
@@ -259,7 +269,7 @@ class Solver():
         return log, game_trees, self.simulation_env.participants
 
     # one single pass of MCTS for one  learner
-    def MCTS(self, learner, max_it, **kwargs):
+    def mcts(self, learner, max_it, **kwargs):
         # designate the target agent
         # self.learner = learner
         print(learner)
@@ -269,7 +279,7 @@ class Solver():
         time_start = self.simulation_env.configs['study']['start_timestamp'] #first state of the cropped data piece
         s_0 = self.encode_states(participant=learner, time=time_start - 60)
 
-        game_tree = {}
+        game_tree = dict()
         game_tree[s_0] = {'N': 0}
         # We need a data structure to store the 'game tree'
         # A dict with a hashed list l as key; l = [ts, a1, ...an]
@@ -288,7 +298,8 @@ class Solver():
                                                          game_tree=game_tree,
                                                          s_0=s_0,
                                                          **kwargs)
-        return {learner: (game_tree, s_0)}
+        return {learner: {'game_tree': game_tree,
+                          's_0': s_0}}
         # return game_tree, s_0
 
     # this update the policy from game tree and evaluate the policy
@@ -651,8 +662,8 @@ class Solver():
 
 
 if __name__ == '__main__':
-    solver = Solver('TB3B', constant_load=True)
-    log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=10000)
+    solver = Solver('TB3T', constant_load=True)
+    log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=1000, c_adjustment=1)
 
     plotter = log_plotter(log)
     plotter.plot_prices()

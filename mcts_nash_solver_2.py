@@ -253,34 +253,11 @@ class Solver():
         # designate the target agent
         # self.learner = learner
         print(learner)
-
-        # elif self.test_scenario == 'variable' or self.test_scenario == 'fixed' :
-        #     self.actions = {'price': np.linspace(self.prices_max_min[1], self.prices_max_min[0], action_space['price']),
-        #                     'quantity': np.linspace(0, 30, action_space['quantity'])
-        #                     }
-
-        # action_space = {}
-        # self.shape_action_space = []
-        # actions = self.simulation_env.participants[learner]['trader']['actions']
-        # for action in actions:
-        #     action_space[action] = len(actions[action])
-        #     self.shape_action_space.append(len(actions[action]))
-        #
-        # # for action_dimension in self.simulation_env.participants[learner]['trader']['actions']:
-        # #     self.shape_action_space.append(len(self.simulation_env.participants[learner]['trader']['actions'][action_dimension]))
-        # # determine the size of the action space, I am sure this can be done better
-        #
-        # num_individual_entries = 1
-        # for dimension in self.shape_action_space:
-        #     num_individual_entries = num_individual_entries*dimension
-        # self.linear_action_space = np.arange(num_individual_entries).tolist()
-
         self.c_ucb = c_adjustment
-
-        # determine start and build the actual game tree
 
         time_start = self.simulation_env.configs['study']['start_timestamp'] #first state of the cropped data piece
         s_0 = self.encode_states(participant=learner, time=time_start - 60)
+
         game_tree = {}
         game_tree[s_0] = {'N': 0}
         # We need a data structure to store the 'game tree'
@@ -308,8 +285,7 @@ class Solver():
             # establish the best policy and test
             game_tree = game_trees[participant]
             s_0 = s_0s[participant]
-            action_space = self.action_spaces[participant]
-            self._update_policy_from_tree(participant, game_tree, s_0, action_space)
+            self._update_policy_from_tree(participant, game_tree, s_0)
 
         for participant in self.simulation_env.participants:
             G, quant, avg_prices = self.evaluate_current_policy(participant=participant, do_print=True)
@@ -337,7 +313,7 @@ class Solver():
         return measurement_dict
 
     # update the policy from the game tree
-    def _update_policy_from_tree(self, participant, game_tree, s_0, action_space):
+    def _update_policy_from_tree(self, participant, game_tree, s_0):
         # the idea is to follow a greedy policy from S_0 as long as we can and then switch over to the default rollout policy
         finished = False
         s_now = s_0
@@ -635,7 +611,7 @@ class Solver():
 
 if __name__ == '__main__':
     solver = Solver('TB3T', constant_load=True)
-    log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=1000)
+    log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=10000)
     plotter = log_plotter(log)
     # plotter.plot_prices()
     plotter.plot_quantities()

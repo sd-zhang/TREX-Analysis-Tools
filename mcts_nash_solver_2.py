@@ -18,6 +18,10 @@ class Solver():
         for participant in self.simulation_env.participants:
             self.__setup_initial_actions(participant)
 
+        self.action_spaces = {}
+        self.shape_action_space = {}
+        self.linear_action_space = {}
+
     def __setup_initial_actions(self, participant):
         self.simulation_env.participants[participant]['metrics'] = {}
         metrics = self.simulation_env.participants[participant]['metrics']
@@ -206,19 +210,36 @@ class Solver():
         log = {}
         game_trees = {}
         s_0s = {}
-        action_spaces = {}
 
-        for participant in self.simulation_env.participants:
+        learning_participants = [participant for participant in self.simulation_env.participants if
+                                 self.simulation_env.participants[participant]['trader']['learning']]
+
+        for participant in learning_participants:
             log[participant] = {'G': [],
                                 'quant': []}
+
+            self.shape_action_space[participant] = []
+            self.action_spaces[participant] = {}
+
+            actions = self.simulation_env.participants[participant]['trader']['actions']
+            for action in actions:
+                self.action_spaces[participant][action] = len(actions[action])
+                self.shape_action_space[participant].append(len(actions[action]))
+
+            num_individual_entries = 1
+            for dimension in self.shape_action_space[participant]:
+                num_individual_entries = num_individual_entries * dimension
+            self.linear_action_space[participant] = np.arange(num_individual_entries).tolist()
 
         for gen in range(generations):
             for participant in self.simulation_env.participants:
                 print('MCTS gen', gen, 'for', participant)
-                game_trees[participant], s_0s[participant], action_spaces[participant] = \
+                game_trees[participant], s_0s[participant] = \
                     self.MCTS(participant, max_it_per_gen, c_adjustment)
 
-            log = self._update_policies_and_evaluate(game_trees, s_0s, action_spaces, log)
+            log = self._update_policies_and_evaluate(game_trees=game_trees,
+                                                     s_0s=s_0s,
+                                                     measurement_dict=log)
         # if self.test_scenario == 'fixed' or self.test_scenario == 'variable':
         #     self._plot_log(log)
         # else:
@@ -230,28 +251,28 @@ class Solver():
     def MCTS(self, learner, max_it, c_adjustment=1):
         # designate the target agent
         self.learner = learner
-        print(learner)
+        print(self.learner, learner)
 
         # elif self.test_scenario == 'variable' or self.test_scenario == 'fixed' :
         #     self.actions = {'price': np.linspace(self.prices_max_min[1], self.prices_max_min[0], action_space['price']),
         #                     'quantity': np.linspace(0, 30, action_space['quantity'])
         #                     }
 
-        action_space = {}
-        self.shape_action_space = []
-        actions = self.simulation_env.participants[learner]['trader']['actions']
-        for action in actions:
-            action_space[action] = len(actions[action])
-            self.shape_action_space.append(len(actions[action]))
-
-        # for action_dimension in self.simulation_env.participants[learner]['trader']['actions']:
-        #     self.shape_action_space.append(len(self.simulation_env.participants[learner]['trader']['actions'][action_dimension]))
-        # determine the size of the action space, I am sure this can be done better
-
-        num_individual_entries = 1
-        for dimension in self.shape_action_space:
-            num_individual_entries = num_individual_entries*dimension
-        self.linear_action_space = np.arange(num_individual_entries).tolist()
+        # action_space = {}
+        # self.shape_action_space = []
+        # actions = self.simulation_env.participants[learner]['trader']['actions']
+        # for action in actions:
+        #     action_space[action] = len(actions[action])
+        #     self.shape_action_space.append(len(actions[action]))
+        #
+        # # for action_dimension in self.simulation_env.participants[learner]['trader']['actions']:
+        # #     self.shape_action_space.append(len(self.simulation_env.participants[learner]['trader']['actions'][action_dimension]))
+        # # determine the size of the action space, I am sure this can be done better
+        #
+        # num_individual_entries = 1
+        # for dimension in self.shape_action_space:
+        #     num_individual_entries = num_individual_entries*dimension
+        # self.linear_action_space = np.arange(num_individual_entries).tolist()
 
         self.c_ucb = c_adjustment
 
@@ -279,44 +300,41 @@ class Solver():
                                                          game_tree=game_tree,
                                                          s_0=s_0)
 
-        return game_tree, s_0, action_space
+        return game_tree, s_0
 
     # this update the policy from game tree and evaluate the policy
-    def _update_policies_and_evaluate(self, game_trees, s_0s, action_spaces, measurment_dict):
-
+    def _update_policies_and_evaluate(self, game_trees, s_0s, measurement_dict):
         for participant in self.simulation_env.participants:
             # establish the best policy and test
             game_tree = game_trees[participant]
             s_0 = s_0s[participant]
-            action_space = action_spaces[participant]
+            action_space = self.action_spaces[participant]
             self._update_policy_from_tree(participant, game_tree, s_0, action_space)
 
         for participant in self.simulation_env.participants:
             G, quant, avg_prices = self.evaluate_current_policy(participant=participant, do_print=True)
-            if 'G' not in measurment_dict[participant]:
-                measurment_dict[participant]['G'] = [G]
+            if 'G' not in measurement_dict[participant]:
+                measurement_dict[participant]['G'] = [G]
             else:
-                measurment_dict[participant]['G'].append(G)
+                measurement_dict[participant]['G'].append(G)
 
-            if 'quant' not in measurment_dict[participant]:
-                measurment_dict[participant]['quant'] = [quant]
+            if 'quant' not in measurement_dict[participant]:
+                measurement_dict[participant]['quant'] = [quant]
             else:
-                measurment_dict[participant]['quant'].append(quant)
+                measurement_dict[participant]['quant'].append(quant)
 
-            if 'avg_prices' not in measurment_dict[participant]:
-                measurment_dict[participant]['avg_prices'] = {}
+            if 'avg_prices' not in measurement_dict[participant]:
+                measurement_dict[participant]['avg_prices'] = {}
                 for category in avg_prices:
-                    measurment_dict[participant]['avg_prices'][category] = [avg_prices[category]]
+                    measurement_dict[participant]['avg_prices'][category] = [avg_prices[category]]
             else:
                 for category in avg_prices:
 
-                    if category not in measurment_dict[participant]['avg_prices']:
-                        measurment_dict[participant]['avg_prices'][category] = [avg_prices[category]]
+                    if category not in measurement_dict[participant]['avg_prices']:
+                        measurement_dict[participant]['avg_prices'][category] = [avg_prices[category]]
                     else:
-                        measurment_dict[participant]['avg_prices'][category].append(avg_prices[category])
-
-
-        return measurment_dict
+                        measurement_dict[participant]['avg_prices'][category].append(avg_prices[category])
+        return measurement_dict
 
     # update the policy from the game tree
     def _update_policy_from_tree(self, participant, game_tree, s_0, action_space):
@@ -428,11 +446,13 @@ class Solver():
         return s_next
     # decode actions, placeholder function for more complex action spaces
     def decode_actions(self, participant, a, ts, action_types, do_print=False):
-        #TODO: MCTS breaks when this self.learner is replaced with participant
+        # TODO: MCTS breaks when this self.learner is replaced with participant
         actions_dict = self.simulation_env.participants[self.learner]['metrics'][ts]
-        actions = self.simulation_env.participants[participant]['trader']['actions']
+        # actions_dict = self.simulation_env.participants[participant]['metrics'][ts]
         # print(actions_dict)
-        a = np.unravel_index(int(a), self.shape_action_space)
+
+        actions = self.simulation_env.participants[participant]['trader']['actions']
+        a = np.unravel_index(int(a), self.shape_action_space[participant])
         # print(price)
         for action_type in action_types:
             if action_type in {'bids', 'asks'}:
@@ -493,7 +513,9 @@ class Solver():
         # its no leaf node, so we expand using ucb policy
         else:
 
-            a = self._ucb(game_tree, s_now)
+            a = self._ucb(participant=participant,
+                          game_tree=game_tree,
+                          s_now=s_now)
             if a not in game_tree[s_now]['a']: #equivalent to game_tree[s_now]['a'][a]['n'] == 0
                 game_tree[s_now]['a'][a] = {'r': None,
                                             'n': 0,
@@ -553,7 +575,7 @@ class Solver():
     # random action selection for rollouts
     def one_default_step(self, participant, s_now):
         finished = False
-        a = np.random.choice(self.linear_action_space)
+        a = np.random.choice(self.linear_action_space[participant])
         ts, _ = self.decode_states(s_now)
         r, s_next = self.evaluate_transition(participant=participant,
                                              s_now=s_now,
@@ -574,16 +596,16 @@ class Solver():
 
         return V
 
-    def _ucb(self, game_tree, s_now, c=0.05):
+    def _ucb(self, participant, game_tree, s_now, c=0.05):
         # UCB formula: V_ucb_next = V + c*sqrt(ln(N_s)/n_s_next)
 
         N_s = game_tree[s_now]['N']
         all_s_next = []
-        num_actions = len(self.linear_action_space)
+        num_actions = len(self.linear_action_space[participant])
         Q_ucb = [None]*num_actions # determine the value of all followup transitions states
 
         for idx_a in range(num_actions):
-            a = self.linear_action_space[idx_a]
+            a = self.linear_action_space[participant][idx_a]
             if a not in game_tree[s_now]['a']:
                 n_next = 0 #if the aqction transition isnt logged, we havent sampled it yet
                 Q_ucb[idx_a] = np.inf
@@ -602,7 +624,7 @@ class Solver():
 
         #making sure we pick the maximums at random
         a_ucb_index = np.random.choice(np.where(Q_ucb == np.max(Q_ucb))[0])
-        a_ucb = self.linear_action_space[a_ucb_index]
+        a_ucb = self.linear_action_space[participant][a_ucb_index]
         return a_ucb
 
 

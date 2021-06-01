@@ -68,20 +68,6 @@ class Solver():
             metrics[t_start]['gen'] = generation
             metrics[t_start]['load'] = consumption
 
-        self.action_space[participant] = {}
-        for action in self.simulation_env.participants[participant]['trader']['actions']:
-            self.action_space[participant][action] = len(self.simulation_env.participants[participant]['trader']['actions'][action])
-
-        self.shape_action_space[participant] = []
-        for action_dimension in self.simulation_env.participants[participant]['trader']['actions']:
-            self.shape_action_space[participant].append(len(self.simulation_env.participants[participant]['trader']['actions'][action_dimension]))
-
-        # determine the size of the action space, I am sure this can be done better
-        num_individual_entries = 1
-        for dimension in self.shape_action_space[participant]:
-            num_individual_entries = num_individual_entries*dimension
-        self.linear_action_space[participant] = np.arange(num_individual_entries).tolist()
-
         return None
     # get the market settlement for one specific row for one specific agent from self.simulation_env.participants
     def _query_market_get_reward_for_one_tuple(self, timestamp, participant,

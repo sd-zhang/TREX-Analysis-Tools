@@ -246,7 +246,7 @@ class Solver():
             #         self.MCTS(participant, max_it_per_gen, c_adjustment)
 
             with Parallel(n_jobs=len(self.simulation_env.participants)) as parallel:
-                results = parallel(delayed(self.MCTS)(participant, max_it_per_gen, c_adjustment) for
+                results = parallel(delayed(self.MCTS)(participant, max_it_per_gen, c=c_adjustment) for
                                    participant in self.simulation_env.participants)
             for result in results:
                 for participant in result:
@@ -259,12 +259,12 @@ class Solver():
         return log, game_trees, self.simulation_env.participants
 
     # one single pass of MCTS for one  learner
-    def MCTS(self, learner, max_it, c_adjustment=1):
+    def MCTS(self, learner, max_it, **kwargs):
         # designate the target agent
         # self.learner = learner
         print(learner)
 
-        self.c_ucb = c_adjustment
+        # self.c_ucb = c_adjustment
 
         time_start = self.simulation_env.configs['study']['start_timestamp'] #first state of the cropped data piece
         s_0 = self.encode_states(participant=learner, time=time_start - 60)
@@ -286,7 +286,8 @@ class Solver():
         for it in range(max_it):
             game_tree = self._one_MCT_rollout_and_backup(participant=learner,
                                                          game_tree=game_tree,
-                                                         s_0=s_0)
+                                                         s_0=s_0,
+                                                         **kwargs)
         return {learner: (game_tree, s_0)}
         # return game_tree, s_0
 
@@ -380,7 +381,7 @@ class Solver():
                     print('failed because we found unidentified state!')
 
     # one MCTS rollout
-    def _one_MCT_rollout_and_backup(self, participant, game_tree, s_0):
+    def _one_MCT_rollout_and_backup(self, participant, game_tree, s_0, **kwargs):
 
         s_now = s_0
         action = None
@@ -392,7 +393,8 @@ class Solver():
             trajectory.append((s_now, action))
             game_tree, s_now, action, finished = self._one_MCTS_step(participant=participant,
                                                                      game_tree=game_tree,
-                                                                     s_now=s_now)
+                                                                     s_now=s_now,
+                                                                     **kwargs)
 
 
         game_tree = self.bootstrap_values(trajectory, game_tree)
@@ -502,7 +504,7 @@ class Solver():
         return s_next
 
     # a single step of MCTS, one node evaluation
-    def _one_MCTS_step(self, participant, game_tree, s_now):
+    def _one_MCTS_step(self, participant, game_tree, s_now, **kwargs):
 
         #see if wee are in a leaf node
         finished = False
@@ -524,7 +526,8 @@ class Solver():
 
             a = self._ucb(participant=participant,
                           game_tree=game_tree,
-                          s_now=s_now)
+                          s_now=s_now,
+                          **kwargs)
 
             if a not in game_tree[s_now]['a']: #equivalent to game_tree[s_now]['a'][a]['n'] == 0
                 game_tree[s_now]['a'][a] = {'r': None,
@@ -609,7 +612,8 @@ class Solver():
 
         return V
 
-    def _ucb(self, participant, game_tree, s_now, c=0.05):
+    def _ucb(self, participant, game_tree, s_now, c):
+        # print(c)
 
         # UCB formula: V_ucb_next = V + c*sqrt(ln(N_s)/n_s_next)
 
@@ -617,7 +621,7 @@ class Solver():
         all_s_next = []
 
         num_actions = len(self.linear_action_space[participant])
-        Q_ucb = [None]*num_actions # determine the value of all followup transitions states
+        Q_ucb = [None] * num_actions  # determine the value of all followup transitions states
 
         for idx_a in range(num_actions):
             a = self.linear_action_space[participant][idx_a]
@@ -632,11 +636,11 @@ class Solver():
                 r = game_tree[s_now]['a'][a]['r']
                 ts, _ = self.decode_states(s_next)
                 if ts >= self.time_end:
-                    V_next = 0
+                    v_next = 0
                 else:
-                    V_next = game_tree[s_next]['V']
-                Q = r + V_next
-                Q_ucb[idx_a]= Q + self.c_ucb*np.sqrt(np.log(N_s)/n_next)
+                    v_next = game_tree[s_next]['V']
+                q = r + v_next
+                Q_ucb[idx_a] = q + c * np.sqrt(np.log(N_s)/n_next)
 
         #making sure we pick the maximums at random
         a_ucb_index = np.random.choice(np.where(Q_ucb == np.max(Q_ucb))[0])

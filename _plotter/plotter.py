@@ -8,12 +8,15 @@ class log_plotter():
         self.log = log
 
     def plot_returns(self, export=False):
+        num_agents = len([participant for participant in self.log])
+        g_fig, g_ax = plt.subplots(num_agents, 1, sharex=True)
+        g_ax[0].set_xlabel('Generations')
 
-        g_fig, g_ax = plt.subplots()
-        g_ax.set_xlabel('Generations')
-        g_ax.set_ylabel('Return')
+        plot_nbr = 0
         for participant in self.log:
-            g_ax.plot(self.log[participant]['G'], label=participant)
+            g_ax[plot_nbr].set_ylabel('Return')
+            g_ax[plot_nbr].plot(self.log[participant]['G'], label=participant)
+            plot_nbr +=1
 
         g_fig.legend()
         g_fig.show()

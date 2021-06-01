@@ -450,19 +450,11 @@ class Solver():
     def evaluate_transition(self, participant, s_now, a):
         # for now the state tuple is: (time)
         timestamp, _ = self.decode_states(s_now) # _ being a placeholder for now
-
-        #find the appropriate row in the dataframee
-        # row = self.simulation_env.participants[self.learner]['metrics'].index[self.simulation_env.participants[self.learner]['metrics']['timestamp'] == timestamp]
-        # row = row[0]
-
-        action_types = [action for action in self.simulation_env.participants[self.learner]['metrics'][timestamp]]
-        # print('before: ')
-        # print(self.simulation_env.participants[self.learner]['metrics'].at[row, 'actions_dict'])
+        action_types = [action for action in self.simulation_env.participants[participant]['metrics'][timestamp]]
         actions = self.decode_actions(a, timestamp, action_types)
-        # print('after: ')
-        # print(self.simulation_env.participants[self.learner]['metrics'].at[row, 'actions_dict'])
-        # print(self.simulation_env.participants[self.learner]['metrics']['actions_dict'][row])
-        r, _, __ = self._query_market_get_reward_for_one_tuple(timestamp, self.learner, do_print=False)
+        r, _, __ = self._query_market_get_reward_for_one_tuple(timestamp=timestamp,
+                                                               participant=participant,
+                                                               do_print=False)
         s_next = self.encode_states(participant=participant,
                                     time=timestamp)
 

@@ -428,8 +428,9 @@ class Solver():
         return s_next
     # decode actions, placeholder function for more complex action spaces
     def decode_actions(self, participant, a, ts, action_types, do_print=False):
+        # print(participant, self.learner)
         actions_dict = self.simulation_env.participants[self.learner]['metrics'][ts]
-        actions = self.simulation_env.participants[self.learner]['trader']['actions']
+        actions = self.simulation_env.participants[participant]['trader']['actions']
         # print(actions_dict)
         a = np.unravel_index(int(a), self.shape_action_space)
         # print(price)
@@ -439,7 +440,7 @@ class Solver():
                                                 {'quantity': actions['quantity'][a[1]],
                                                 'price': actions['price'][a[0]],
                                                 'source': 'solar',
-                                                'participant_id': self.learner
+                                                'participant_id': participant
                                                 }
                                             }
             elif action_type == 'battery':

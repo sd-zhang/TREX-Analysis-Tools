@@ -428,21 +428,22 @@ class Solver():
         return s_next
     # decode actions, placeholder function for more complex action spaces
     def decode_actions(self, participant, a, ts, action_types, do_print=False):
-        # print(participant, self.learner)
+        #TODO: MCTS breaks when this self.learner is replaced with participant
         actions_dict = self.simulation_env.participants[self.learner]['metrics'][ts]
         actions = self.simulation_env.participants[participant]['trader']['actions']
         # print(actions_dict)
         a = np.unravel_index(int(a), self.shape_action_space)
         # print(price)
         for action_type in action_types:
-            if (action_type == 'bids' or action_type == 'asks'):
-                actions_dict[action_types[0]] = {str((ts-60, ts)):
-                                                {'quantity': actions['quantity'][a[1]],
-                                                'price': actions['price'][a[0]],
-                                                'source': 'solar',
-                                                'participant_id': participant
-                                                }
-                                            }
+            if action_type in {'bids', 'asks'}:
+                actions_dict[action_types[0]] = {
+                    str((ts-60, ts)): {
+                        'quantity': actions['quantity'][a[1]],
+                        'price': actions['price'][a[0]],
+                        'source': 'solar',
+                        'participant_id': participant
+                        }
+                    }
             elif action_type == 'battery':
                 actions_dict['battery']['target_flux'] = actions['battery'][a[-1]]
                 actions_dict['battery']['battery_SoC'] = None

@@ -21,6 +21,7 @@ class Solver():
         self.action_spaces = {}
         self.shape_action_space = {}
         self.linear_action_space = {}
+        self.time_end = self.simulation_env.configs['study']['end_timestamp'] - 60
 
     def __setup_initial_actions(self, participant):
         self.simulation_env.participants[participant]['metrics'] = {}
@@ -250,8 +251,8 @@ class Solver():
     # one single pass of MCTS for one  learner
     def MCTS(self, learner, max_it, c_adjustment=1):
         # designate the target agent
-        self.learner = learner
-        print(self.learner, learner)
+        # self.learner = learner
+        print(learner)
 
         # elif self.test_scenario == 'variable' or self.test_scenario == 'fixed' :
         #     self.actions = {'price': np.linspace(self.prices_max_min[1], self.prices_max_min[0], action_space['price']),
@@ -279,7 +280,6 @@ class Solver():
         # determine start and build the actual game tree
 
         time_start = self.simulation_env.configs['study']['start_timestamp'] #first state of the cropped data piece
-        self.time_end = self.simulation_env.configs['study']['end_timestamp'] - 60
         s_0 = self.encode_states(participant=learner, time=time_start - 60)
         game_tree = {}
         game_tree[s_0] = {'N': 0}
@@ -369,6 +369,12 @@ class Solver():
                                                                         s_now=s_now)
 
                 action_types = [action for action in self.simulation_env.participants[participant]['metrics'][timestamp]]
+                # TODO: MCTS breaks when this self.learner is replaced with participant
+                # actions = self.decode_actions(participant=self.learner,
+                #                               a=a_state,
+                #                               ts=timestamp,
+                #                               action_types=action_types,
+                #                               do_print=True)
                 actions = self.decode_actions(participant=participant,
                                               a=a_state,
                                               ts=timestamp,
@@ -434,7 +440,7 @@ class Solver():
     def encode_states(self, participant, time:int):
         # for now we only encode  time
         if 'battery' in self.simulation_env.participants[participant]['trader']['actions']:
-            if time+60 <= self.time_start:
+            if time + 60 <= self.time_start:
                 SoC = 0
             else:
                 SoC = self.simulation_env.participants[participant]['metrics'][time]['battery']['battery_SoC']
@@ -446,9 +452,8 @@ class Solver():
         return s_next
     # decode actions, placeholder function for more complex action spaces
     def decode_actions(self, participant, a, ts, action_types, do_print=False):
-        # TODO: MCTS breaks when this self.learner is replaced with participant
-        actions_dict = self.simulation_env.participants[self.learner]['metrics'][ts]
-        # actions_dict = self.simulation_env.participants[participant]['metrics'][ts]
+        # actions_dict = self.simulation_env.participants[self.learner]['metrics'][ts]
+        actions_dict = self.simulation_env.participants[participant]['metrics'][ts]
         # print(actions_dict)
 
         actions = self.simulation_env.participants[participant]['trader']['actions']

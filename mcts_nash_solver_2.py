@@ -15,6 +15,10 @@ class Solver():
     def __init__(self, config_name, constant_load=True):
         self.simulation_env = SimulationEnvironment(config_name)
         self.reward = Reward()
+        self.action_space = {}
+        self.shape_action_space = {}
+        self.linear_action_space = {}
+
         for participant in self.simulation_env.participants:
             self.__setup_initial_actions(participant)
 
@@ -64,6 +68,20 @@ class Solver():
             metrics[t_start]['gen'] = generation
             metrics[t_start]['load'] = consumption
 
+        self.action_space[participant] = {}
+        for action in self.simulation_env.participants[participant]['trader']['actions']:
+            self.action_space[participant][action] = len(self.simulation_env.participants[participant]['trader']['actions'][action])
+
+        self.shape_action_space[participant] = []
+        for action_dimension in self.simulation_env.participants[participant]['trader']['actions']:
+            self.shape_action_space[participant].append(len(self.simulation_env.participants[participant]['trader']['actions'][action_dimension]))
+
+        # determine the size of the action space, I am sure this can be done better
+        num_individual_entries = 1
+        for dimension in self.shape_action_space[participant]:
+            num_individual_entries = num_individual_entries*dimension
+        self.linear_action_space[participant] = np.arange(num_individual_entries).tolist()
+
         return None
     # get the market settlement for one specific row for one specific agent from self.simulation_env.participants
     def _query_market_get_reward_for_one_tuple(self, timestamp, participant,
@@ -95,7 +113,8 @@ class Solver():
 
         # we need access to start_energy [0 ... max_energy] and a target_action [-max_energy, max_energy]
         if 'battery' in participants[participant]['metrics'][timestamp]:
-            if timestamp == time_start: #FixMe: Apparently Daniel fucked up time here somehow, the very first row of Metrics never gets updated to a real SoC
+          
+            if timestamp == time_start: #FixMe: Apparently Daniel fucked up time here somehow, the very first row of Metrics never gets updated to a real So
                 bat_SoC_start = 0
             else:
                 if timestamp-60 not in participants[participant]['metrics']: # FixMe: catch for general shit
@@ -112,6 +131,7 @@ class Solver():
                 bat_target_flux = 0
 
             bat_real_flux, bat_SoC_post = self.simulation_env.participants[participant]['storage'].simulate_activity(start_energy=bat_SoC_start, target_energy=bat_target_flux)
+
             self.simulation_env.participants[participant]['metrics'][timestamp]['battery']['battery_SoC'] = bat_SoC_post
             # if bat_SoC_start - bat_SoC_post  != 0:
             #     print('target flux: ', bat_target_flux)
@@ -235,12 +255,14 @@ class Solver():
         for gen in range(generations):
             for participant in self.simulation_env.participants:
                 print('MCTS gen', gen, 'for', participant)
+                
                 game_trees[participant], s_0s[participant] = \
                     self.MCTS(participant, max_it_per_gen, c_adjustment)
 
             log = self._update_policies_and_evaluate(game_trees=game_trees,
                                                      s_0s=s_0s,
                                                      measurement_dict=log)
+
         # if self.test_scenario == 'fixed' or self.test_scenario == 'variable':
         #     self._plot_log(log)
         # else:
@@ -253,6 +275,7 @@ class Solver():
         # designate the target agent
         # self.learner = learner
         print(learner)
+
         self.c_ucb = c_adjustment
 
         time_start = self.simulation_env.configs['study']['start_timestamp'] #first state of the cropped data piece
@@ -277,15 +300,19 @@ class Solver():
                                                          game_tree=game_tree,
                                                          s_0=s_0)
 
+
         return game_tree, s_0
 
     # this update the policy from game tree and evaluate the policy
     def _update_policies_and_evaluate(self, game_trees, s_0s, measurement_dict):
+
         for participant in self.simulation_env.participants:
             # establish the best policy and test
             game_tree = game_trees[participant]
             s_0 = s_0s[participant]
+            
             self._update_policy_from_tree(participant, game_tree, s_0)
+
 
         for participant in self.simulation_env.participants:
             G, quant, avg_prices = self.evaluate_current_policy(participant=participant, do_print=True)
@@ -312,6 +339,7 @@ class Solver():
                         measurement_dict[participant]['avg_prices'][category].append(avg_prices[category])
         return measurement_dict
 
+    #ToDo: seems like this doesnt do what it is supposed to anymore? actions do not get saved anywhere....
     # update the policy from the game tree
     def _update_policy_from_tree(self, participant, game_tree, s_0):
         # the idea is to follow a greedy policy from S_0 as long as we can and then switch over to the default rollout policy
@@ -341,6 +369,7 @@ class Solver():
                 else: #well, use the rollout policy then
                     print('using rollout because we found a leaf node, maybe adjust c_ubc or num_it')
                     print(s_now)
+                    
                     _, s_now, a_state, finished = self.one_default_step(participant=participant,
                                                                         s_now=s_now)
 
@@ -357,6 +386,7 @@ class Solver():
                                               action_types=action_types,
                                               do_print=True)
 
+
             else: #well, use the rollout policy then
                 finished = True
                 if s_now not in game_tree:
@@ -364,6 +394,7 @@ class Solver():
 
     # one MCTS rollout
     def _one_MCT_rollout_and_backup(self, participant, game_tree, s_0):
+
         s_now = s_0
         action = None
         trajectory = []
@@ -375,6 +406,7 @@ class Solver():
             game_tree, s_now, action, finished = self._one_MCTS_step(participant=participant,
                                                                      game_tree=game_tree,
                                                                      s_now=s_now)
+
 
         game_tree = self.bootstrap_values(trajectory, game_tree)
 
@@ -413,6 +445,7 @@ class Solver():
         return timestamp, None
 
     # same as decode, but backwards...^^
+    
     def encode_states(self, participant, time:int):
         # for now we only encode  time
         if 'battery' in self.simulation_env.participants[participant]['trader']['actions']:
@@ -420,13 +453,16 @@ class Solver():
                 SoC = 0
             else:
                 SoC = self.simulation_env.participants[participant]['metrics'][time]['battery']['battery_SoC']
+
         else:
             SoC = None
 
         t_next = time + 60
         s_next = (t_next, SoC)
         return s_next
+
     # decode actions, placeholder function for more complex action spaces
+    
     def decode_actions(self, participant, a, ts, action_types, do_print=False):
         # actions_dict = self.simulation_env.participants[self.learner]['metrics'][ts]
         actions_dict = self.simulation_env.participants[participant]['metrics'][ts]
@@ -447,10 +483,12 @@ class Solver():
                     }
             elif action_type == 'battery':
                 actions_dict['battery']['target_flux'] = actions['battery'][a[-1]]
+
                 actions_dict['battery']['battery_SoC'] = None
         return actions_dict
 
     # figure out the reward/weight of one transition
+    
     def evaluate_transition(self, participant, s_now, a):
         # for now the state tuple is: (time)
         timestamp, _ = self.decode_states(s_now) # _ being a placeholder for now
@@ -465,6 +503,7 @@ class Solver():
         s_next = self.encode_states(participant=participant,
                                     time=timestamp)
 
+
         # print(r)
         return r, s_next
 
@@ -477,13 +516,15 @@ class Solver():
 
     # a single step of MCTS, one node evaluation
     def _one_MCTS_step(self, participant, game_tree, s_now):
+
         #see if wee are in a leaf node
         finished = False
-
         # check of leaf node, if leaf node then do rollout, estimate V of node
         if 'a' not in game_tree[s_now]:
+          
             game_tree[s_now]['V'] = self.default_rollout(participant=participant,
                                                          s_now=s_now)
+
             game_tree[s_now]['a'] = {}
             game_tree[s_now]['N'] += 0
 
@@ -497,6 +538,7 @@ class Solver():
             a = self._ucb(participant=participant,
                           game_tree=game_tree,
                           s_now=s_now)
+
             if a not in game_tree[s_now]['a']: #equivalent to game_tree[s_now]['a'][a]['n'] == 0
                 game_tree[s_now]['a'][a] = {'r': None,
                                             'n': 0,
@@ -505,6 +547,7 @@ class Solver():
             r, s_next = self.evaluate_transition(participant=participant,
                                                  s_now=s_now,
                                                  a=a)
+
             ts, _ = self.decode_states(s_next)
             game_tree[s_now]['a'][a]['r'] = r
             game_tree[s_now]['a'][a]['n'] += 1
@@ -561,6 +604,7 @@ class Solver():
         r, s_next = self.evaluate_transition(participant=participant,
                                              s_now=s_now,
                                              a=a)
+
         if ts == self.time_end:
             finished = True
 
@@ -572,21 +616,25 @@ class Solver():
         while not finished:
             r, s_next, _, finished = self.one_default_step(participant=participant,
                                                            s_now=s_now)
+
             s_now = s_next
             V += r
 
         return V
 
     def _ucb(self, participant, game_tree, s_now, c=0.05):
+
         # UCB formula: V_ucb_next = V + c*sqrt(ln(N_s)/n_s_next)
 
         N_s = game_tree[s_now]['N']
         all_s_next = []
+        
         num_actions = len(self.linear_action_space[participant])
         Q_ucb = [None]*num_actions # determine the value of all followup transitions states
 
         for idx_a in range(num_actions):
             a = self.linear_action_space[participant][idx_a]
+
             if a not in game_tree[s_now]['a']:
                 n_next = 0 #if the aqction transition isnt logged, we havent sampled it yet
                 Q_ucb[idx_a] = np.inf
@@ -605,13 +653,16 @@ class Solver():
 
         #making sure we pick the maximums at random
         a_ucb_index = np.random.choice(np.where(Q_ucb == np.max(Q_ucb))[0])
+        
         a_ucb = self.linear_action_space[participant][a_ucb_index]
+
         return a_ucb
 
 
 if __name__ == '__main__':
-    solver = Solver('TB3T', constant_load=True)
+    solver = Solver('TB3B', constant_load=True)
     log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=10000)
+
     plotter = log_plotter(log)
     # plotter.plot_prices()
     plotter.plot_quantities()

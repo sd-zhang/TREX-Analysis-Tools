@@ -107,8 +107,7 @@ class Solver():
                 bat_target_flux = 0
 
             bat_real_flux, bat_SoC_post = self.simulation_env.participants[self.learner]['storage'].simulate_activity(start_energy=bat_SoC_start, target_energy=bat_target_flux)
-
-            self.simulation_env.participants[learning_participant]['metrics'][timestamp]['battery']['battery_SoC'] = bat_SoC_post
+            self.simulation_env.participants[participant]['metrics'][timestamp]['battery']['battery_SoC'] = bat_SoC_post
             # if bat_SoC_start - bat_SoC_post  != 0:
             #     print('target flux: ', bat_target_flux)
             #     print('actual flux: ', bat_real_flux)
@@ -138,15 +137,14 @@ class Solver():
     # helper for _query_market_get_reward_for_one_tuple, to see what we get or put into grid
     # ToDo: check here to make sure this is right
     def _extract_grid_transactions(self, market_ledger, learning_participant, timestamp, battery=0.0):
-        sucessful_bids = sum([sett[1] for sett in market_ledger if sett[0] == 'bid'])
-        sucessful_asks = sum([sett[1] for sett in market_ledger if sett[0] == 'ask'])
-
+        successful_bids = sum([sett[1] for sett in market_ledger if sett[0] == 'bid'])
+        successful_asks = sum([sett[1] for sett in market_ledger if sett[0] == 'ask'])
 
         generation = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['gen']
         consumption = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['load']
 
-        residual_consumption = consumption - sucessful_bids
-        residual_generation = generation - sucessful_asks
+        residual_consumption = consumption - successful_bids
+        residual_generation = generation - successful_asks
         net_grid_load = residual_consumption - residual_generation
 
         # not sure what this logically means???
@@ -356,7 +354,7 @@ class Solver():
                     _, s_now, a_state, finished = self.one_default_step(participant=participant,
                                                                         s_now=s_now)
 
-                action_types = [action for action in self.simulation_env.participants[self.learner]['metrics'][timestamp]]
+                action_types = [action for action in self.simulation_env.participants[participant]['metrics'][timestamp]]
                 actions = self.decode_actions(a_state, timestamp, action_types, do_print=True)
 
             else: #well, use the rollout policy then

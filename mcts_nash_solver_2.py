@@ -106,7 +106,7 @@ class Solver():
             if bat_target_flux == None:
                 bat_target_flux = 0
 
-            bat_real_flux, bat_SoC_post = self.simulation_env.participants[self.learner]['storage'].simulate_activity(start_energy=bat_SoC_start, target_energy=bat_target_flux)
+            bat_real_flux, bat_SoC_post = self.simulation_env.participants[participant]['storage'].simulate_activity(start_energy=bat_SoC_start, target_energy=bat_target_flux)
             self.simulation_env.participants[participant]['metrics'][timestamp]['battery']['battery_SoC'] = bat_SoC_post
             # if bat_SoC_start - bat_SoC_post  != 0:
             #     print('target flux: ', bat_target_flux)
@@ -228,13 +228,9 @@ class Solver():
 
     # one single pass of MCTS for one  learner
     def MCTS(self, learner, max_it, c_adjustment=1):
-
         # designate the target agent
-        # if learner is None:
-        #     self.learner = list(self.simulation_env.participants.keys())[0]
-        # else:
         self.learner = learner
-        print(self.learner)
+        print(learner)
 
         # elif self.test_scenario == 'variable' or self.test_scenario == 'fixed' :
         #     self.actions = {'price': np.linspace(self.prices_max_min[1], self.prices_max_min[0], action_space['price']),
@@ -429,20 +425,21 @@ class Solver():
     # decode actions, placeholder function for more complex action spaces
     def decode_actions(self, a, ts, action_types, do_print=False):
         actions_dict = self.simulation_env.participants[self.learner]['metrics'][ts]
+        actions = self.simulation_env.participants[self.learner]['trader']['actions']
         # print(actions_dict)
         a = np.unravel_index(int(a), self.shape_action_space)
         # print(price)
         for action_type in action_types:
             if (action_type == 'bids' or action_type == 'asks'):
                 actions_dict[action_types[0]] = {str((ts-60, ts)):
-                                                {'quantity': self.simulation_env.participants[self.learner]['trader']['actions']['quantity'][a[1]],
-                                                'price': self.simulation_env.participants[self.learner]['trader']['actions']['price'][a[0]],
+                                                {'quantity': actions['quantity'][a[1]],
+                                                'price': actions['price'][a[0]],
                                                 'source': 'solar',
                                                 'participant_id': self.learner
                                                 }
                                             }
             elif action_type == 'battery':
-                actions_dict['battery']['target_flux'] = self.simulation_env.participants[self.learner]['trader']['actions']['battery'][a[-1]]
+                actions_dict['battery']['target_flux'] = actions['battery'][a[-1]]
                 actions_dict['battery']['battery_SoC'] = None
         return actions_dict
 

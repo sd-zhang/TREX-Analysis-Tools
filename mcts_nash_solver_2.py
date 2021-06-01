@@ -351,7 +351,11 @@ class Solver():
                                                                         s_now=s_now)
 
                 action_types = [action for action in self.simulation_env.participants[participant]['metrics'][timestamp]]
-                actions = self.decode_actions(a_state, timestamp, action_types, do_print=True)
+                actions = self.decode_actions(participant=participant,
+                                              a=a_state,
+                                              ts=timestamp,
+                                              action_types=action_types,
+                                              do_print=True)
 
             else: #well, use the rollout policy then
                 finished = True
@@ -423,7 +427,7 @@ class Solver():
         s_next = (t_next, SoC)
         return s_next
     # decode actions, placeholder function for more complex action spaces
-    def decode_actions(self, a, ts, action_types, do_print=False):
+    def decode_actions(self, participant, a, ts, action_types, do_print=False):
         actions_dict = self.simulation_env.participants[self.learner]['metrics'][ts]
         actions = self.simulation_env.participants[self.learner]['trader']['actions']
         # print(actions_dict)
@@ -448,7 +452,10 @@ class Solver():
         # for now the state tuple is: (time)
         timestamp, _ = self.decode_states(s_now) # _ being a placeholder for now
         action_types = [action for action in self.simulation_env.participants[participant]['metrics'][timestamp]]
-        actions = self.decode_actions(a, timestamp, action_types)
+        actions = self.decode_actions(participant=participant,
+                                      a=a,
+                                      ts=timestamp,
+                                      action_types=action_types)
         r, _, __ = self._query_market_get_reward_for_one_tuple(timestamp=timestamp,
                                                                participant=participant,
                                                                do_print=False)

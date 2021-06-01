@@ -61,14 +61,15 @@ class Solver():
 
         return None
     # get the market settlement for one specific row for one specific agent from self.simulation_env.participants
-    def _query_market_get_reward_for_one_tuple(self, timestamp, learning_participant,
+    def _query_market_get_reward_for_one_tuple(self, timestamp, participant,
                                                do_print=False,  # idiot debug flag
                                                ):
 
         # get the market ledger
+        time_start = self.simulation_env.configs['study']['start_timestamp']
         participants = self.simulation_env.participants
         market_df = sim_market(participants=participants,
-                               learning_agent_id=learning_participant,
+                               learning_agent_id=participant,
                                timestamp=timestamp)
 
         market_ledger = []
@@ -77,7 +78,7 @@ class Solver():
         for index in range(market_df.shape[0]):
             settlement = market_df.iloc[index]
             quantity = settlement['quantity']
-            entry = _map_market_to_ledger(settlement, learning_participant, do_print)
+            entry = _map_market_to_ledger(settlement, participant, do_print)
             if entry is not None:
                 market_ledger.append(entry)
         # if market_ledger:
@@ -88,15 +89,15 @@ class Solver():
         # ToDO: test if market is actually doing the right thing
 
         # we need access to start_energy [0 ... max_energy] and a target_action [-max_energy, max_energy]
-        if 'battery' in participants[learning_participant]['metrics'][timestamp]:
-            if timestamp == self.time_start: #FixMe: Apparently Daniel fucked up time here somehow, the very first row of Metrics never gets updated to a real SoC
+        if 'battery' in participants[participant]['metrics'][timestamp]:
+            if timestamp == time_start: #FixMe: Apparently Daniel fucked up time here somehow, the very first row of Metrics never gets updated to a real SoC
                 bat_SoC_start = 0
             else:
-                if timestamp-60 not in participants[learning_participant]['metrics']: # FixMe: catch for general shit
+                if timestamp-60 not in participants[participant]['metrics']: # FixMe: catch for general shit
                     print('missing ts!!')
-                bat_SoC_start = participants[learning_participant]['metrics'][timestamp-60]['battery']['battery_SoC']
+                bat_SoC_start = participants[participant]['metrics'][timestamp-60]['battery']['battery_SoC']
 
-            bat_target_flux = participants[learning_participant]['metrics'][timestamp]['battery']['target_flux']
+            bat_target_flux = participants[participant]['metrics'][timestamp]['battery']['target_flux']
 
             # seems like this is error prone somehow?!
             if bat_SoC_start == None: # toDo: catch and fix, once this area is debugged get rid
@@ -118,7 +119,7 @@ class Solver():
 
         # calculate the resulting grid transactions
         grid_transactions = self._extract_grid_transactions(market_ledger=market_ledger,
-                                                            learning_participant=learning_participant,
+                                                            learning_participant=participant,
                                                             timestamp=timestamp,
                                                             battery=bat_real_flux)
         # print(learning_participant, 'grid trans:', grid_transactions)
@@ -170,9 +171,14 @@ class Solver():
         G = 0
         quant_cum = 0
         avg_prices = {}
-        timestamps = np.arange(self.time_start, self.time_end, 60)
-        for timestamp in timestamps:
-
+        # time_start = self.simulation_env.configs['study']['start_timestamp']
+        # timestamps = np.arange(time_start, self.time_end, 60)
+        profile = self.simulation_env.participants[participant]['profile']
+        # for timestamp in timestamps:
+        for step in profile[:-1]:
+            timestamp = step['tstamp']
+            # if timestamp >= self.time_end:
+            #     break
             r, quant, avg_price_row = self._query_market_get_reward_for_one_tuple(timestamp, participant, True)
 
             for category in avg_price_row:
@@ -189,7 +195,6 @@ class Solver():
                 avg_prices[category] = np.nanmean(avg_prices[category])
             else:
                 avg_prices[category] = np.nan
-
 
         if do_print:
             print('Policy of agent ', participant, ' achieves the following return: ', G)
@@ -212,7 +217,6 @@ class Solver():
                                 'quant': []}
 
         for gen in range(generations):
-
             for participant in self.simulation_env.participants:
                 print('MCTS gen', gen, 'for', participant)
                 game_trees[participant], s_0s[participant], action_spaces[participant] = \
@@ -262,9 +266,9 @@ class Solver():
 
         # determine start and build the actual game tree
 
-        self.time_start = self.simulation_env.configs['study']['start_timestamp'] #first state of the cropped data piece
+        time_start = self.simulation_env.configs['study']['start_timestamp'] #first state of the cropped data piece
         self.time_end = self.simulation_env.configs['study']['end_timestamp'] - 60
-        s_0 = self.encode_states(time=self.time_start-60)
+        s_0 = self.encode_states(learner, time=time_start - 60)
         game_tree = {}
         game_tree[s_0] = {'N': 0}
         # We need a data structure to store the 'game tree'

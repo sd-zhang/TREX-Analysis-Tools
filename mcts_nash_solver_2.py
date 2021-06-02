@@ -213,16 +213,18 @@ class Solver():
     # run MCTS for every agent in the game tree...
     def MA_MCTS(self,
                 max_it_per_gen,
-                c_adjustment):
+                c_adjustment,
+                learner_fraction_anneal=False, #Experimental feature that might help calm violence of conversion
+                ):
         generations = self.simulation_env.configs['study']['generations']
         metrics_dict = {}
         game_trees = {}
         s_0s = {}
 
-        learning_participants = [participant for participant in self.simulation_env.participants if
+        potential_learning_participants = [participant for participant in self.simulation_env.participants if
                                  self.simulation_env.participants[participant]['trader']['learning']]
 
-        for participant in learning_participants:
+        for participant in potential_learning_participants:
             metrics_dict[participant] = {'G': [],
                                 'quant': []}
 
@@ -244,8 +246,17 @@ class Solver():
             game_trees.clear()
             s_0s.clear()
 
-            # serial execution code
-            for participant in self.simulation_env.participants:
+            if learner_fraction_anneal:
+                fraction_to_optimize = (generations - gen)/generations
+                fraction_to_optimize = len(potential_learning_participants) * fraction_to_optimize
+                fraction_to_optimize = int(np.ceil(fraction_to_optimize))
+                learning_participants = np.random.choice(potential_learning_participants, fraction_to_optimize, replace=False).tolist()
+                print('selecting ', fraction_to_optimize/len(potential_learning_participants)*100 , 'percent of available participants to learn')
+                # serial execution code
+            else:
+                learning_participants = potential_learning_participants
+
+            for participant in learning_participants:
                 print('MCTS gen', gen, 'for', participant)
                 result = self.mcts(learner=participant, max_it=max_it_per_gen, c=c_adjustment)
                 game_trees[participant] = result[participant]['game_tree']
@@ -332,7 +343,7 @@ class Solver():
     def _update_policies_and_evaluate(self, game_trees, s_0s, metrics_dict):
 
         #update policies from the game tree into the participants_dictionary for all agents
-        for participant in self.simulation_env.participants:
+        for participant in game_trees:
             # establish the best policy and test
             game_tree = game_trees[participant]
             s_0 = s_0s[participant]
@@ -525,13 +536,6 @@ class Solver():
         # print(r)
         return r, s_next
 
-    # determine the next stat
-    def _next_states(self, participant, s_now, a):
-        t_now = s_now[0]
-        s_next = self.encode_states(participant=participant,
-                                    time=t_now)
-        return s_next
-
     # a single step of MCTS, one node evaluation
     def _one_MCTS_step(self, participant, game_tree, s_now, **kwargs):
 
@@ -553,25 +557,29 @@ class Solver():
         # its no leaf node, so we expand using ucb policy
         else:
 
+            #determing ucb next action
             a = self._ucb(participant=participant,
                           game_tree=game_tree,
                           s_now=s_now,
                           **kwargs)
 
-            if a not in game_tree[s_now]['a']: #equivalent to game_tree[s_now]['a'][a]['n'] == 0
-                game_tree[s_now]['a'][a] = {'r': None,
-                                            'n': 0,
-                                            's_next': None} #gotta mak sure all those get populated
-
             r, s_next = self.evaluate_transition(participant=participant,
                                                  s_now=s_now,
                                                  a=a)
+            # this means we're taking a leaf node
+            if a not in game_tree[s_now]['a']: #equivalent to game_tree[s_now]['a'][a]['n'] == 0
+                game_tree[s_now]['a'][a] = {'r': r,
+                                            'n': 0,
+                                            's_next': s_next} #gotta mak sure all those get populated
+
+            if game_tree[s_now]['a'][a]['s_next'] != s_next:
+                print('encountered non causal state transitions, unforseen and might break code behavior!!!')
+            if game_tree[s_now]['a'][a]['r'] != r:
+                print('encountered non cuasal reward, unforseen and might break code behavior!!')
 
             ts, _ = self.decode_states(s_next)
-            game_tree[s_now]['a'][a]['r'] = r
             game_tree[s_now]['a'][a]['n'] += 1
             game_tree[s_now]['N'] += 1
-            game_tree[s_now]['a'][a]['s_next'] = s_next
 
             # update V estimate for node
             if s_next not in game_tree and ts <= self.time_end:
@@ -594,24 +602,6 @@ class Solver():
             #         finished = True
             #
             #     return game_tree, s_next, finished
-
-    # add to the game tree
-    def __add_s_next(self, participant, game_tree, s_now, action_space):
-        a_next = {}
-        for action in action_space:
-            s_next = self._next_states(participant=participant,
-                                       s_now=s_now,
-                                       a=action)
-
-            ts, _ = self.decode_states(s_next)
-            if s_next not in game_tree and ts <= self.time_end:
-                game_tree[s_next] = {'N': 0}
-
-            a_next[str(action)] = {'r': None,
-                              'n': 0,
-                              's_next': s_next}
-        game_tree[s_now]['a'] = a_next
-        return game_tree
 
     # here's the two policies that we'll be using for now:
     # UCB for the tree traversal
@@ -681,7 +671,7 @@ class Solver():
 
 if __name__ == '__main__':
     solver = Solver('TB3B', constant_load=True)
-    log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=10000, c_adjustment=1)
+    log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=10000, c_adjustment=1, learner_fraction_anneal=True)
 
     plotter = log_plotter(log)
     plotter.plot_prices()

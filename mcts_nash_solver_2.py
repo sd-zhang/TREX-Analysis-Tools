@@ -136,7 +136,8 @@ class Solver():
 
         # then calculate the reward function
         rewards, avg_prices = self.reward.calculate(market_transactions=market_ledger,
-                                                        grid_transactions=grid_transactions)
+                                                    grid_transactions=grid_transactions,
+                                                    financial_transactions=None)
         # print('r: ', rewards)
         # if do_print:
         # print('market', market_ledger)
@@ -671,7 +672,7 @@ class Solver():
 
 if __name__ == '__main__':
     solver = Solver('TB3B', constant_load=True)
-    log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=10000, c_adjustment=1, learner_fraction_anneal=True)
+    log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=50000, c_adjustment=1, learner_fraction_anneal=True)
 
     plotter = log_plotter(log)
     plotter.plot_prices()

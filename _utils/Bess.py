@@ -38,7 +38,7 @@ class Storage:
         }
 
     # Collect status of battery charge at start and end of turn/ current scheduled battery charge or discharge
-    def simulate_activity(self, start_energy:int, target_energy=0, duration_s=60):
+    def simulate_activity(self, start_energy: int, target_energy=0, duration_s=60):
         storage_capacity = self.__info['capacity']
         start_energy = max(0, min(start_energy, storage_capacity))
         duration_h = duration_s / 3600

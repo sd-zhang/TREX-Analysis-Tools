@@ -136,7 +136,8 @@ class Solver():
 
         # then calculate the reward function
         rewards, avg_prices = self.reward.calculate(market_transactions=market_ledger,
-                                                    grid_transactions=grid_transactions)
+                                                    grid_transactions=grid_transactions,
+                                                    financial_transactions=None)
         # print('r: ', rewards)
         # if do_print:
         # print('market', market_ledger)
@@ -213,22 +214,25 @@ class Solver():
             print('Policy of agent ', participant, ' achieves the following return: ', G)
             print('settled quantity is: ', quant_cum)
             print('avg prices: ', avg_prices)
+            print('.........................................')
         return G, quant_cum, avg_prices
 
     # run MCTS for every agent in the game tree...
     def MA_MCTS(self,
                 max_it_per_gen,
-                c_adjustment):
+                c_adjustment,
+                learner_fraction_anneal=False, #Experimental feature that might help calm violence of conversion
+                ):
         generations = self.simulation_env.configs['study']['generations']
-        log = {}
+        metrics_dict = {}
         game_trees = {}
         s_0s = {}
 
-        learning_participants = [participant for participant in self.simulation_env.participants if
+        potential_learning_participants = [participant for participant in self.simulation_env.participants if
                                  self.simulation_env.participants[participant]['trader']['learning']]
 
-        for participant in learning_participants:
-            log[participant] = {'G': [],
+        for participant in potential_learning_participants:
+            metrics_dict[participant] = {'G': [],
                                 'quant': []}
 
             self.shape_action_space[participant] = []
@@ -249,8 +253,17 @@ class Solver():
             game_trees.clear()
             s_0s.clear()
 
-            # serial execution code
-            for participant in self.simulation_env.participants:
+            if learner_fraction_anneal:
+                fraction_to_optimize = (generations - gen)/generations
+                fraction_to_optimize = len(potential_learning_participants) * fraction_to_optimize
+                fraction_to_optimize = int(np.ceil(fraction_to_optimize))
+                learning_participants = np.random.choice(potential_learning_participants, fraction_to_optimize, replace=False).tolist()
+                print('selecting ', fraction_to_optimize/len(potential_learning_participants)*100 , 'percent of available participants to learn')
+                # serial execution code
+            else:
+                learning_participants = potential_learning_participants
+
+            for participant in learning_participants:
                 print('MCTS gen', gen, 'for', participant)
                 result = self.mcts(learner=participant, max_it=max_it_per_gen, c=c_adjustment)
                 game_trees[participant] = result[participant]['game_tree']
@@ -269,16 +282,15 @@ class Solver():
             #         game_trees[participant] = result[participant]['game_tree']
             #         s_0s[participant] = result[participant]['s_0']
 
-            log = self._update_policies_and_evaluate(game_trees=game_trees,
+            metrics_dict = self._update_policies_and_evaluate(game_trees=game_trees,
                                                      s_0s=s_0s,
-                                                     measurement_dict=log)
-        return log, game_trees, self.simulation_env.participants
+                                                     metrics_dict=metrics_dict)
+        return metrics_dict, game_trees, self.simulation_env.participants
 
     # one single pass of MCTS for one  learner
     def mcts(self, learner, max_it, **kwargs):
         # designate the target agent
         # self.learner = learner
-        print(learner)
 
         # self.c_ucb = c_adjustment
 
@@ -309,9 +321,36 @@ class Solver():
         # return game_tree, s_0
 
     # this update the policy from game tree and evaluate the policy
-    def _update_policies_and_evaluate(self, game_trees, s_0s, measurement_dict):
+    def _update_metrics_dict(self, G, quant, avg_prices, metrics_dict, participant):
+        # format log
+        if 'G' not in metrics_dict[participant]:
+            metrics_dict[participant]['G'] = [G]
+        else:
+            metrics_dict[participant]['G'].append(G)
 
-        for participant in self.simulation_env.participants:
+        if 'quant' not in metrics_dict[participant]:
+            metrics_dict[participant]['quant'] = [quant]
+        else:
+            metrics_dict[participant]['quant'].append(quant)
+
+        if 'avg_prices' not in metrics_dict[participant]:
+            metrics_dict[participant]['avg_prices'] = {}
+            for category in avg_prices:
+                metrics_dict[participant]['avg_prices'][category] = [avg_prices[category]]
+        else:
+            for category in avg_prices:
+
+                if category not in metrics_dict[participant]['avg_prices']:
+                    metrics_dict[participant]['avg_prices'][category] = [avg_prices[category]]
+                else:
+                    metrics_dict[participant]['avg_prices'][category].append(avg_prices[category])
+
+        return metrics_dict
+
+    def _update_policies_and_evaluate(self, game_trees, s_0s, metrics_dict):
+
+        #update policies from the game tree into the participants_dictionary for all agents
+        for participant in game_trees:
             # establish the best policy and test
             game_tree = game_trees[participant]
             s_0 = s_0s[participant]
@@ -319,83 +358,73 @@ class Solver():
             self._update_policy_from_tree(participant, game_tree, s_0)
 
 
+        # evaluate the current policy and log metrics
         for participant in self.simulation_env.participants:
+            # evaluate
             G, quant, avg_prices = self.evaluate_current_policy(participant=participant, do_print=True)
-            if 'G' not in measurement_dict[participant]:
-                measurement_dict[participant]['G'] = [G]
-            else:
-                measurement_dict[participant]['G'].append(G)
+            metrics_dict = self._update_metrics_dict(G=G,
+                                                     quant=quant,
+                                                     avg_prices=avg_prices,
+                                                     metrics_dict=metrics_dict,
+                                                     participant=participant)
 
-            if 'quant' not in measurement_dict[participant]:
-                measurement_dict[participant]['quant'] = [quant]
-            else:
-                measurement_dict[participant]['quant'].append(quant)
-
-            if 'avg_prices' not in measurement_dict[participant]:
-                measurement_dict[participant]['avg_prices'] = {}
-                for category in avg_prices:
-                    measurement_dict[participant]['avg_prices'][category] = [avg_prices[category]]
-            else:
-                for category in avg_prices:
-
-                    if category not in measurement_dict[participant]['avg_prices']:
-                        measurement_dict[participant]['avg_prices'][category] = [avg_prices[category]]
-                    else:
-                        measurement_dict[participant]['avg_prices'][category].append(avg_prices[category])
-        return measurement_dict
+        return metrics_dict
 
     #ToDo: seems like this doesnt do what it is supposed to anymore? actions do not get saved anywhere....
     # update the policy from the game tree
     def _update_policy_from_tree(self, participant, game_tree, s_0):
+
+        def greedy_policy(game_tree, s_now):
+            Q = []
+            actions = []
+            for a in game_tree[s_now]['a']:
+                r = game_tree[s_now]['a'][a]['r']
+                s_next = game_tree[s_now]['a'][a]['s_next']
+                if s_next in game_tree:
+                    V = game_tree[s_next]['V']
+                else:
+                    V = 0
+                Q.append(V + r)
+                actions.append(a)
+
+            index = np.random.choice(np.where(Q == np.max(Q))[0])
+            a_state = actions[index]
+            s_now = game_tree[s_now]['a'][a_state]['s_next']
+            return a_state, s_now
+
         # the idea is to follow a greedy policy from S_0 as long as we can and then switch over to the default rollout policy
         finished = False
         s_now = s_0
         while not finished:
             timestamp, _ = self.decode_states(s_now)
-            if timestamp <= self.time_end and s_now in game_tree:
-                if len(game_tree[s_now]['a']) > 0: #meaning we know the Q values, --> pick greedily
 
-                    Q = []
-                    actions = []
-                    for a in game_tree[s_now]['a']:
-                        r = game_tree[s_now]['a'][a]['r']
-                        s_next = game_tree[s_now]['a'][a]['s_next']
-                        if s_next in game_tree:
-                            V = game_tree[s_next]['V']
-                        else:
-                            V = 0
-                        Q.append(V + r)
-                        actions.append(a)
+            # do we continue? make sure all terminating conditions are checked for here!
+            if timestamp >= self.time_end:
+                finished = True
 
-                    index = np.random.choice(np.where(Q == np.max(Q))[0])
-                    a_state = actions[index]
-                    s_now = game_tree[s_now]['a'][a_state]['s_next']
+            # do we have Q values for this tree? To do so s_now must be in the tree and have action values
+            if s_now in game_tree:
+                if len(game_tree[s_now]['a']) > 0: # we know the Q values, --> pick greedily
+                    a_state, s_now = greedy_policy(game_tree, s_now)
 
-                else: #well, use the rollout policy then
-                    print('using rollout because we found a leaf node, maybe adjust c_ubc or num_it')
-                    print(s_now)
-
+                else: #well, use the rollout policy then, give a warnign that we ran into a known leaf node (we know the state but not the values)
+                    print('using rollout because we found a known leaf node, maybe adjust c_ubc or num_it')
                     _, s_now, a_state, finished = self.one_default_step(participant=participant,
                                                                         s_now=s_now)
+            else: # use rollout policy, we found a totally unknown leaf node! This is potentially bad
+                print('using rollout because we found an unknown leaf node, perform troubleshoot pls...')
+                _, s_now, a_state, finished = self.one_default_step(participant=participant,
+                                                                    s_now=s_now)
 
-                action_types = [action for action in self.simulation_env.participants[participant]['metrics'][timestamp]]
-                # TODO: MCTS breaks when this self.learner is replaced with participant
-                # actions = self.decode_actions(participant=self.learner,
-                #                               a=a_state,
-                #                               ts=timestamp,
-                #                               action_types=action_types,
-                #                               do_print=True)
-                actions = self.decode_actions(participant=participant,
-                                              a=a_state,
-                                              ts=timestamp,
-                                              action_types=action_types,
-                                              do_print=True)
+           # decoding the actions aleady updates the participants dictionary, not much to do there :-)
+            actions = self.decode_actions(participant=participant,
+                                          a=a_state,
+                                          ts=timestamp,
+                                          action_types=[action for action in self.simulation_env.participants[participant]['metrics'][timestamp]],
+                                          do_print=True)
 
 
-            else: #well, use the rollout policy then
-                finished = True
-                if s_now not in game_tree:
-                    print('failed because we found unidentified state!')
+
 
     # one MCTS rollout
     def _one_MCT_rollout_and_backup(self, participant, game_tree, s_0, **kwargs):
@@ -479,6 +508,7 @@ class Solver():
         # print(price)
         for action_type in action_types:
             if action_type in {'bids', 'asks'}:
+
                 actions_dict[action_types[0]] = {
                     str((ts-60, ts)): {
                         'quantity': actions['quantity'][a[1]],
@@ -513,13 +543,6 @@ class Solver():
         # print(r)
         return r, s_next
 
-    # determine the next stat
-    def _next_states(self, participant, s_now, a):
-        t_now = s_now[0]
-        s_next = self.encode_states(participant=participant,
-                                    time=t_now)
-        return s_next
-
     # a single step of MCTS, one node evaluation
     def _one_MCTS_step(self, participant, game_tree, s_now, **kwargs):
 
@@ -541,25 +564,29 @@ class Solver():
         # its no leaf node, so we expand using ucb policy
         else:
 
+            #determing ucb next action
             a = self._ucb(participant=participant,
                           game_tree=game_tree,
                           s_now=s_now,
                           **kwargs)
 
-            if a not in game_tree[s_now]['a']: #equivalent to game_tree[s_now]['a'][a]['n'] == 0
-                game_tree[s_now]['a'][a] = {'r': None,
-                                            'n': 0,
-                                            's_next': None} #gotta mak sure all those get populated
-
             r, s_next = self.evaluate_transition(participant=participant,
                                                  s_now=s_now,
                                                  a=a)
+            # this means we're taking a leaf node
+            if a not in game_tree[s_now]['a']: #equivalent to game_tree[s_now]['a'][a]['n'] == 0
+                game_tree[s_now]['a'][a] = {'r': r,
+                                            'n': 0,
+                                            's_next': s_next} #gotta mak sure all those get populated
+
+            if game_tree[s_now]['a'][a]['s_next'] != s_next:
+                print('encountered non causal state transitions, unforseen and might break code behavior!!!')
+            if game_tree[s_now]['a'][a]['r'] != r:
+                print('encountered non cuasal reward, unforseen and might break code behavior!!')
 
             ts, _ = self.decode_states(s_next)
-            game_tree[s_now]['a'][a]['r'] = r
             game_tree[s_now]['a'][a]['n'] += 1
             game_tree[s_now]['N'] += 1
-            game_tree[s_now]['a'][a]['s_next'] = s_next
 
             # update V estimate for node
             if s_next not in game_tree and ts <= self.time_end:
@@ -582,24 +609,6 @@ class Solver():
             #         finished = True
             #
             #     return game_tree, s_next, finished
-
-    # add to the game tree
-    def __add_s_next(self, participant, game_tree, s_now, action_space):
-        a_next = {}
-        for action in action_space:
-            s_next = self._next_states(participant=participant,
-                                       s_now=s_now,
-                                       a=action)
-
-            ts, _ = self.decode_states(s_next)
-            if s_next not in game_tree and ts <= self.time_end:
-                game_tree[s_next] = {'N': 0}
-
-            a_next[str(action)] = {'r': None,
-                              'n': 0,
-                              's_next': s_next}
-        game_tree[s_now]['a'] = a_next
-        return game_tree
 
     # here's the two policies that we'll be using for now:
     # UCB for the tree traversal
@@ -668,8 +677,8 @@ class Solver():
 
 
 if __name__ == '__main__':
-    solver = Solver('TB3T', constant_load=True)
-    log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=1000, c_adjustment=1)
+    solver = Solver('TB3B', constant_load=True)
+    log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=5000, c_adjustment=1, learner_fraction_anneal=True)
 
     plotter = log_plotter(log)
     plotter.plot_prices()

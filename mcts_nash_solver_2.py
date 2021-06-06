@@ -166,9 +166,9 @@ class Solver():
         residual_consumption = consumption - total_bids
         residual_generation = generation - total_asks
 
-        deficit_generation = residual_generation if residual_generation < 0 else 0
+        deficit_generation = max(0, -residual_generation)
         over_discharge = 0
-        if residual_generation < 0:
+        if deficit_generation:
             bess_compensation = min(deficit_generation, -battery) if battery < 0 else 0
             if bess_compensation:
                 deficit_generation -= bess_compensation

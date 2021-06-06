@@ -166,18 +166,17 @@ class Solver():
         residual_consumption = consumption - total_bids
         residual_generation = generation - total_asks
 
-        compensation = 0
+        deficit_generation = residual_generation if residual_generation < 0 else 0
         over_discharge = 0
         if residual_generation < 0:
-            bess_compensation = min(-residual_generation, -battery) if battery < 0 else 0
+            bess_compensation = min(deficit_generation, -battery) if battery < 0 else 0
             if bess_compensation:
-                deficit_generation = -residual_generation - bess_compensation
+                deficit_generation -= bess_compensation
                 residual_bess_discharge = -battery - bess_compensation
-                compensation = deficit_generation
                 over_discharge = residual_bess_discharge
 
         # compensations are lumped together with final "grid" quantities for now
-        final_grid_buy = residual_consumption + max(0, battery) + compensation
+        final_grid_buy = residual_consumption + max(0, battery) + deficit_generation
         final_grid_sell = residual_generation + over_discharge
 
         return (max(0, final_grid_buy), grid_buy_price, max(0, final_grid_sell), grid_sell_price)

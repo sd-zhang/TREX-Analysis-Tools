@@ -148,33 +148,38 @@ class Solver():
 
     # helper for _query_market_get_reward_for_one_tuple, to see what we get or put into grid
     # ToDo: check here to make sure this is right
-    def _extract_grid_transactions(self, market_ledger, learning_participant, timestamp, battery=0.0):
-        successful_bids = sum([sett[1] for sett in market_ledger if sett[0] == 'bid'])
-        successful_asks = sum([sett[1] for sett in market_ledger if sett[0] == 'ask'])
+    def _extract_grid_transactions(self, market_ledger, learning_participant, timestamp, battery=0):
+        # if market_ledger:
+        #     print(market_ledger)
+        grid_sell_price = self.simulation_env.configs['market']['grid']['price']
+        grid_buy_price = grid_sell_price * (1 + self.simulation_env.configs['market']['grid']['fee_ratio'])
 
         generation = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['gen']
         consumption = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['load']
 
-        residual_consumption = consumption - successful_bids
-        residual_generation = generation - successful_asks
-        net_grid_load = residual_consumption - residual_generation
+        bids = [sett for sett in market_ledger if sett[0] == 'bid']
+        asks = [sett for sett in market_ledger if sett[0] == 'ask']
 
-        # not sure what this logically means???
-        # commented out for record keeping
-        # net_influx = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['gen'] - sucessful_asks
-        # net_outflux = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['load'] - sucessful_bids
+        total_bids = sum([bid[1] for bid in bids])
+        total_asks = sum([ask[1] for ask in asks])
 
-        # print(learning_participant, market_ledger)
-        # print(learning_participant, sucessful_bids, sucessful_asks)
-        # print(learning_participant, generation, consumption)
-        # print('---')
+        residual_consumption = consumption - total_bids
+        residual_generation = generation - total_asks
 
-        grid_load = net_grid_load + battery
-        grid_sell_price = self.simulation_env.configs['market']['grid']['price']
-        grid_buy_price = grid_sell_price * (1 + self.simulation_env.configs['market']['grid']['fee_ratio'])
-        return (max(0, grid_load), grid_buy_price, max(0, -grid_load), grid_sell_price)
-        # I think this tweak makes more logical sense?
-        # return (max(0, grid_load), max_price, min(0, grid_load), min_price)
+        deficit_generation = max(0, -residual_generation)
+        over_discharge = 0
+        if deficit_generation:
+            bess_compensation = min(deficit_generation, -battery) if battery < 0 else 0
+            if bess_compensation:
+                deficit_generation -= bess_compensation
+                residual_bess_discharge = -battery - bess_compensation
+                over_discharge = residual_bess_discharge
+
+        # compensations are lumped together with final "grid" quantities for now
+        final_grid_buy = residual_consumption + max(0, battery) + deficit_generation
+        final_grid_sell = residual_generation + over_discharge
+
+        return (max(0, final_grid_buy), grid_buy_price, max(0, final_grid_sell), grid_sell_price)
 
     # evaluate current policy of a participant inside a game tree and collects some metrics
     def evaluate_current_policy(self, participant, do_print=True):
@@ -672,7 +677,7 @@ class Solver():
 
 if __name__ == '__main__':
     solver = Solver('TB3B', constant_load=True)
-    log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=50000, c_adjustment=1, learner_fraction_anneal=True)
+    log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=5000, c_adjustment=1, learner_fraction_anneal=True)
 
     plotter = log_plotter(log)
     plotter.plot_prices()

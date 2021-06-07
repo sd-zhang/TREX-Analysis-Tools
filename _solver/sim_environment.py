@@ -47,10 +47,10 @@ class SimulationEnvironment:
 
         # hard code actions for now. Future versions will utilize config file.
         actions['price'] = tuple(np.linspace(trader['bid_price'], trader['ask_price'], 9))
-        actions['quantity'] = tuple(np.arange(11, 25, 2))
+        # actions['quantity'] = tuple(np.arange(10, 31))  # quantity can only be integers
 
         # actions['price'] = tuple(np.array([trader['bid_price'], trader['ask_price']]))
-        # actions['quantity'] = tuple(np.array([17]))  # quantity can only be integers
+        actions['quantity'] = tuple(np.array([17]))  # quantity can only be integers
 
         if 'storage' in self.participants[participant]:
             actions['battery'] = tuple(np.array(([-20, 0, 20])))

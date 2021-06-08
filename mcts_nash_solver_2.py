@@ -200,7 +200,8 @@ class Solver():
 
         return bids, asks,\
                (max(0, final_grid_buy), grid_buy_price, max(0, final_grid_sell), grid_sell_price), \
-               (financial_compensation * grid_buy_price, 0)
+               (financial_compensation, grid_buy_price, 0, grid_sell_price)
+               # (financial_compensation * grid_buy_price, 0)
 
     # evaluate current policy of a participant inside a game tree and collects some metrics
     def evaluate_current_policy(self, participant, do_print=True):

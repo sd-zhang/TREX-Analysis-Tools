@@ -46,9 +46,9 @@ class SimulationEnvironment:
         actions = self.participants[participant]['trader']['actions']
 
         # hard code actions for now. Future versions will utilize config file.
-        # actions['price'] = tuple(np.linspace(trader['bid_price'], trader['ask_price'], 5))
-        actions['price'] = tuple(np.array([0.105]))
-        actions['quantity'] = tuple([15, 17, 19])
+        actions['price'] = tuple(np.linspace(trader['bid_price'], trader['ask_price'], 5))
+        # actions['price'] = tuple(np.array([0.105]))
+        actions['quantity'] = tuple([13, 15, 17, 19, 21])
         # actions['quantity'] = tuple(range(13, 23, 2))
 
         # actions['price'] = tuple(np.array([trader['bid_price'], trader['ask_price']]))

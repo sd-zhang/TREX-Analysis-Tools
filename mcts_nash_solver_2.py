@@ -129,11 +129,15 @@ class Solver():
             bat_real_flux = 0
 
         # calculate the resulting grid transactions
+
+        generation = self.simulation_env.participants[participant]['metrics'][timestamp]['gen']
+        consumption = self.simulation_env.participants[participant]['metrics'][timestamp]['load']
+
         bids, asks, \
         grid_transactions, \
         financial_transactions = self._extract_deliveries(market_ledger=market_ledger,
-                                                          learning_participant=participant,
-                                                          timestamp=timestamp,
+                                                          generation=generation,
+                                                          consumption=consumption,
                                                           battery=bat_real_flux)
 
         # print(market_transactions)
@@ -154,20 +158,20 @@ class Solver():
 
     # helper for _query_market_get_reward_for_one_tuple, to see what we get or put into grid
     # ToDo: check here to make sure this is right
-    def _extract_deliveries(self, market_ledger, learning_participant, timestamp, battery=0):
+    def _extract_deliveries(self, market_ledger, generation, consumption, battery=0):
         # if market_ledger:
         #     print(market_ledger)
         grid_sell_price = self.simulation_env.configs['market']['grid']['price']
         grid_buy_price = grid_sell_price * (1 + self.simulation_env.configs['market']['grid']['fee_ratio'])
 
-        generation = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['gen']
-        consumption = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['load']
+        # generation = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['gen']
+        # consumption = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['load']
 
         # sort asks from highest to lowest
         # sort bids from lowest to highest
         bids = sorted([sett for sett in market_ledger if sett[0] == 'bid'], key=lambda x: x[2], reverse=True)
         asks = sorted([sett for sett in market_ledger if sett[0] == 'ask'], key=lambda x: x[2], reverse=False)
-        print(bids, asks)
+        # print(bids, asks)
 
         total_bids = sum([bid[1] for bid in bids])
         total_asks = sum([ask[1] for ask in asks])
@@ -746,7 +750,7 @@ class Solver():
 
 if __name__ == '__main__':
     solver = Solver('TB3T')
-    log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=10, c_adjustment=1, learner_fraction_anneal=True)
+    log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=5000, c_adjustment=1, learner_fraction_anneal=True)
 
     plotter = log_plotter(log)
     plotter.plot_prices()

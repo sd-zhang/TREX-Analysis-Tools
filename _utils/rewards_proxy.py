@@ -22,8 +22,9 @@ class NetProfit_Reward:
         grid_cost = grid_transactions[0] * grid_transactions[1]
         grid_profit = grid_transactions[2] * grid_transactions[3]
 
-        financial_cost = financial_transactions[0] * financial_transactions[1] if financial_transactions else 0
-        financial_profit = financial_transactions[2] * financial_transactions[3] if financial_transactions else 0
+        financial_cost = financial_transactions[1] if financial_transactions else 0
+        financial_profit = financial_transactions[3] if financial_transactions else 0
+        # financial_profit = 0
 
         total_profit = market_profit + grid_profit + financial_profit
         total_cost = market_cost + grid_cost + financial_cost
@@ -31,9 +32,9 @@ class NetProfit_Reward:
         reward = total_profit - total_cost
 
         # if bids or asks:
-        #     print('---')
-        #     print(bids, asks)
-        #     print(reward, market_cost, market_profit, financial_cost, financial_profit, grid_cost, grid_profit)
+            # print(bids, asks)
+            # print(reward, market_cost, market_profit, financial_cost, financial_profit, grid_cost, grid_profit)
+            # print('---')
 
         bid_quant = sum([t[1] for t in bids]) if bids else 0
         ask_quant = sum([t[1] for t in asks]) if asks else 0

@@ -13,7 +13,7 @@ from joblib import Parallel, delayed
 import matplotlib.pyplot as plt
 # ----------------------------------------------------------------------------------------------------------------------
 class Solver():
-    def __init__(self, config_name, constant_load=True):
+    def __init__(self, config_name):
         self.simulation_env = SimulationEnvironment(config_name)
         self.reward = Reward()
         self.action_space = {}
@@ -26,6 +26,7 @@ class Solver():
         self.action_spaces = {}
         self.shape_action_space = {}
         self.linear_action_space = {}
+        self.time_start = self.simulation_env.configs['study']['start_timestamp']
         self.time_end = self.simulation_env.configs['study']['end_timestamp'] - 60
 
     def __setup_initial_actions(self, participant):
@@ -162,45 +163,91 @@ class Solver():
         generation = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['gen']
         consumption = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['load']
 
-        bids = [sett for sett in market_ledger if sett[0] == 'bid']
-        # asks = [sett for sett in market_ledger if sett[0] == 'ask']
-        # sort asks from highest to lowest - needed for later
-        asks = sorted([sett for sett in market_ledger if sett[0] == 'ask'], key=lambda x: x[2], reverse=True)
-        # print(asks)
+        # sort asks from highest to lowest
+        # sort bids from lowest to highest
+        bids = sorted([sett for sett in market_ledger if sett[0] == 'bid'], key=lambda x: x[2], reverse=True)
+        asks = sorted([sett for sett in market_ledger if sett[0] == 'ask'], key=lambda x: x[2], reverse=False)
+        print(bids, asks)
 
         total_bids = sum([bid[1] for bid in bids])
         total_asks = sum([ask[1] for ask in asks])
 
-        residual_consumption = consumption - total_bids
-        residual_generation = generation - total_asks
+        grid_buy = 0
+        grid_sell = 0
 
-        deficit_generation = max(0, -residual_generation)
-        over_discharge = 0
-        if deficit_generation:
-            bess_compensation = min(deficit_generation, -battery) if battery < 0 else 0
-            if bess_compensation:
-                deficit_generation -= bess_compensation
-                residual_bess_discharge = -battery - bess_compensation
-                over_discharge = residual_bess_discharge
+        financial_buy = [0, 0]
+        financial_sell = [0, 0]
 
-        # for undeliverable asks, must compensate by buying for target from grid
-        financial_compensation = 0
-        while deficit_generation:
-            for idx in range(len(asks)):
-                ask = list(asks[idx])
-                compensation = min(deficit_generation, ask[1])
-                financial_compensation += compensation
-                ask[1] -= compensation
-                deficit_generation -= compensation
-                asks[idx] = tuple(ask)
+        net_consumption = consumption - generation
+        # separate bids into physical and financial
+        if total_bids > net_consumption:
+            bid_deficit = total_bids - (max(0, net_consumption) + battery)
+            if bid_deficit > 0:
+                while bid_deficit:
+                    # print(learning_participant, total_bids, net_consumption, battery, bid_deficit)
+                    for idx in range(len(bids)):
+                        bid = list(bids[idx])
+                        compensation = min(bid_deficit, bid[1])
+                        financial_buy[0] += compensation
+                        financial_buy[1] += compensation * bid[2]
+                        bid[1] -= compensation
+                        bid_deficit -= compensation
+                        bids[idx] = tuple(bid)
+            else:
+                grid_buy -= bid_deficit
+        elif total_bids < net_consumption:
+            residual_consumption = net_consumption - total_bids
+            if battery <= 0:
+                residual_battery = -battery - residual_consumption
+                if residual_battery > 0:
+                    grid_sell += residual_battery
+                else:
+                    grid_buy += residual_consumption + battery
+            else:
+                grid_buy += residual_consumption + battery
 
-        # compensations are lumped together with final "grid" quantities for now
-        final_grid_buy = residual_consumption + max(0, battery) + deficit_generation
-        final_grid_sell = residual_generation + over_discharge
+        # sell more than generated
+        if total_asks > generation:
+            deficit_generation = total_asks - generation
+            # print(deficit_generation)
+            # if battery discharging
+            if battery <= 0:
+                if -battery > deficit_generation:
+                    residual_battery = -battery - deficit_generation
+                    deficit_generation = 0
+                    if residual_battery > consumption:
+                        grid_sell += residual_battery - consumption
+                    else:
+                        grid_buy = consumption - residual_battery
+                else:
+                    deficit_generation += battery
+            while deficit_generation:
+                for idx in range(len(asks)):
+                    ask = list(asks[idx])
+                    compensation = min(deficit_generation, ask[1])
+                    financial_buy[0] += compensation
+                    financial_buy[1] += compensation * grid_buy_price
+                    ask[1] -= compensation
+                    deficit_generation -= compensation
+                    asks[idx] = tuple(ask)
+            # if battery charging or doing nothing
+            else:
+                financial_buy[0] += deficit_generation
+                financial_buy[1] += deficit_generation * grid_buy_price
+                grid_buy += battery
+                grid_buy += consumption
+
+        # if sell less than generated
+        elif total_asks < generation:
+            residual_generation = generation - total_asks
+            if residual_generation >= consumption:
+                grid_sell += (residual_generation - consumption)
+            elif residual_generation < consumption:
+                grid_buy += (consumption - residual_generation)
 
         return bids, asks,\
-               (max(0, final_grid_buy), grid_buy_price, max(0, final_grid_sell), grid_sell_price), \
-               (financial_compensation, grid_buy_price, 0, grid_sell_price)
+               (grid_buy, grid_buy_price, grid_sell, grid_sell_price), \
+               financial_buy + financial_sell
                # (financial_compensation * grid_buy_price, 0)
 
     # evaluate current policy of a participant inside a game tree and collects some metrics
@@ -698,8 +745,8 @@ class Solver():
 
 
 if __name__ == '__main__':
-    solver = Solver('TB3T', constant_load=True)
-    log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=5000, c_adjustment=1, learner_fraction_anneal=True)
+    solver = Solver('TB3T')
+    log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=10, c_adjustment=1, learner_fraction_anneal=True)
 
     plotter = log_plotter(log)
     plotter.plot_prices()

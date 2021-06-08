@@ -128,16 +128,21 @@ class Solver():
             bat_real_flux = 0
 
         # calculate the resulting grid transactions
-        grid_transactions = self._extract_grid_transactions(market_ledger=market_ledger,
-                                                            learning_participant=participant,
-                                                            timestamp=timestamp,
-                                                            battery=bat_real_flux)
+        bids, asks, \
+        grid_transactions, \
+        financial_transactions = self._extract_deliveries(market_ledger=market_ledger,
+                                                          learning_participant=participant,
+                                                          timestamp=timestamp,
+                                                          battery=bat_real_flux)
+
+        # print(market_transactions)
         # print(learning_participant, 'grid trans:', grid_transactions)
 
         # then calculate the reward function
-        rewards, avg_prices = self.reward.calculate(market_transactions=market_ledger,
+        rewards, avg_prices = self.reward.calculate(bids=bids,
+                                                    asks=asks,
                                                     grid_transactions=grid_transactions,
-                                                    financial_transactions=None)
+                                                    financial_transactions=financial_transactions)
         # print('r: ', rewards)
         # if do_print:
         # print('market', market_ledger)
@@ -148,7 +153,7 @@ class Solver():
 
     # helper for _query_market_get_reward_for_one_tuple, to see what we get or put into grid
     # ToDo: check here to make sure this is right
-    def _extract_grid_transactions(self, market_ledger, learning_participant, timestamp, battery=0):
+    def _extract_deliveries(self, market_ledger, learning_participant, timestamp, battery=0):
         # if market_ledger:
         #     print(market_ledger)
         grid_sell_price = self.simulation_env.configs['market']['grid']['price']
@@ -158,7 +163,10 @@ class Solver():
         consumption = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['load']
 
         bids = [sett for sett in market_ledger if sett[0] == 'bid']
-        asks = [sett for sett in market_ledger if sett[0] == 'ask']
+        # asks = [sett for sett in market_ledger if sett[0] == 'ask']
+        # sort asks from highest to lowest - needed for later
+        asks = sorted([sett for sett in market_ledger if sett[0] == 'ask'], key=lambda x: x[2], reverse=True)
+        # print(asks)
 
         total_bids = sum([bid[1] for bid in bids])
         total_asks = sum([ask[1] for ask in asks])
@@ -175,11 +183,25 @@ class Solver():
                 residual_bess_discharge = -battery - bess_compensation
                 over_discharge = residual_bess_discharge
 
+        # for undeliverable asks, must compensate by buying for target from grid
+        financial_compensation = 0
+        while deficit_generation:
+            for idx in range(len(asks)):
+                ask = list(asks[idx])
+                compensation = min(deficit_generation, ask[1])
+                financial_compensation += compensation
+                ask[1] -= compensation
+                deficit_generation -= compensation
+                asks[idx] = tuple(ask)
+
         # compensations are lumped together with final "grid" quantities for now
         final_grid_buy = residual_consumption + max(0, battery) + deficit_generation
         final_grid_sell = residual_generation + over_discharge
 
-        return (max(0, final_grid_buy), grid_buy_price, max(0, final_grid_sell), grid_sell_price)
+        return bids, asks,\
+               (max(0, final_grid_buy), grid_buy_price, max(0, final_grid_sell), grid_sell_price), \
+               (financial_compensation, grid_buy_price, 0, grid_sell_price)
+               # (financial_compensation * grid_buy_price, 0)
 
     # evaluate current policy of a participant inside a game tree and collects some metrics
     def evaluate_current_policy(self, participant, do_print=True):
@@ -676,7 +698,7 @@ class Solver():
 
 
 if __name__ == '__main__':
-    solver = Solver('TB3B', constant_load=True)
+    solver = Solver('TB3T', constant_load=True)
     log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=5000, c_adjustment=1, learner_fraction_anneal=True)
 
     plotter = log_plotter(log)

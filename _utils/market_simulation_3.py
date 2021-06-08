@@ -6,7 +6,7 @@ import copy
 
 # pretend market settlement
 # simulated market for participants, giving back learning agent's settlements, optionally for a specific timestamp
-def sim_market(participants:dict, learning_agent_id:str, timestamp:int=None):
+def sim_market(participants:dict, learning_agent_id:str, timestamp:int):
     learning_agent = participants[learning_agent_id]
     # opponents = copy.deepcopy(participants)
     # opponents.pop(learning_agent_id, None)
@@ -15,11 +15,14 @@ def sim_market(participants:dict, learning_agent_id:str, timestamp:int=None):
 
     learning_agent_times_delivery = []
     market_sim_df = []
-    if timestamp == None:
-        timestamps = participants[learning_agent_id]['metrics'].keys()
-    else:
-        timestamps = [timestamp]
+    # if timestamp == None:
+    #     timestamps = participants[learning_agent_id]['metrics'].keys()
+    # else:
+    #     timestamps = [timestamp]
     # print(row)
+
+    timestamps = [timestamp]
+    # get all actions taken by all agents for a time interval
     for ts in timestamps:
         for participant_id in participants:
             agent_actions = participants[participant_id]['metrics'][ts]
@@ -103,6 +106,7 @@ def settle(bid: dict, ask: dict, time_delivery: tuple):
         'time_delivery': time_delivery
     }
     return record
+
 
 # testing stuff
 # market equality test, the goal is to have the simulated market for the imported participants equal the market database records

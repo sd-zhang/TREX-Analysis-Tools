@@ -30,10 +30,10 @@ class NetProfit_Reward:
         # reward = float(total_profit - total_cost)/1000
         reward = total_profit - total_cost
 
-        if bids or asks:
-            print('---')
-            print(bids, asks)
-            print(reward, market_cost, market_profit, financial_cost, financial_profit, grid_cost, grid_profit)
+        # if bids or asks:
+        #     print('---')
+        #     print(bids, asks)
+        #     print(reward, market_cost, market_profit, financial_cost, financial_profit, grid_cost, grid_profit)
 
         bid_quant = sum([t[1] for t in bids]) if bids else 0
         ask_quant = sum([t[1] for t in asks]) if asks else 0

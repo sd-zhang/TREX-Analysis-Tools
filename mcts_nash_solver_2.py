@@ -698,7 +698,7 @@ class Solver():
 
 if __name__ == '__main__':
     solver = Solver('TB3T', constant_load=True)
-    log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=10, c_adjustment=1, learner_fraction_anneal=True)
+    log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=5000, c_adjustment=1, learner_fraction_anneal=True)
 
     plotter = log_plotter(log)
     plotter.plot_prices()

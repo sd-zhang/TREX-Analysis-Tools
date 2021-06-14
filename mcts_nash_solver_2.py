@@ -492,8 +492,11 @@ class Solver():
             actions = self.decode_actions(participant=participant,
                                           a=a_state,
                                           ts=timestamp,
-                                          action_types=[action for action in self.simulation_env.participants[participant]['metrics'][timestamp]],
                                           do_print=True)
+
+            # print(actions)
+            # print(self.simulation_env.participants[participant]['metrics'][timestamp])
+            self.simulation_env.participants[participant]['metrics'][timestamp].update(actions)
 
 
 
@@ -570,17 +573,14 @@ class Solver():
 
     # decode actions, placeholder function for more complex action spaces
 
-    def decode_actions(self, participant, a, ts, action_types, do_print=False):
-        # actions_dict = self.simulation_env.participants[self.learner]['metrics'][ts]
-        actions_dict = self.simulation_env.participants[participant]['metrics'][ts]
-        # print(actions_dict)
-
+    def decode_actions(self, participant, a, ts, do_print=False):
+        actions_dict = {}
         actions = self.simulation_env.participants[participant]['trader']['actions']
+        action_types = [action for action in self.simulation_env.participants[participant]['metrics'][ts]]
         a = np.unravel_index(int(a), self.shape_action_space[participant])
         # print(price)
         for action_type in action_types:
             if action_type in {'bids', 'asks'}:
-
                 actions_dict[action_types[0]] = {
                     str((ts-60, ts)): {
                         'quantity': actions['quantity'][a[1]],
@@ -591,7 +591,6 @@ class Solver():
                     }
             elif action_type == 'battery':
                 actions_dict['battery']['target_flux'] = actions['battery'][a[-1]]
-
                 actions_dict['battery']['battery_SoC'] = None
         return actions_dict
 
@@ -600,11 +599,10 @@ class Solver():
     def evaluate_transition(self, participant, s_now, a):
         # for now the state tuple is: (time)
         timestamp, _ = self.decode_states(s_now) # _ being a placeholder for now
-        action_types = [action for action in self.simulation_env.participants[participant]['metrics'][timestamp]]
         actions = self.decode_actions(participant=participant,
                                       a=a,
-                                      ts=timestamp,
-                                      action_types=action_types)
+                                      ts=timestamp)
+        self.simulation_env.participants[participant]['metrics'][timestamp].update(actions)
         r, _, __ = self._query_market_get_reward_for_one_tuple(timestamp=timestamp,
                                                                participant=participant,
                                                                do_print=False)

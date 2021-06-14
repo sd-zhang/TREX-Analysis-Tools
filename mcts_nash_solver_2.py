@@ -345,10 +345,6 @@ class Solver():
             # with Parallel(n_jobs=len(self.simulation_env.participants)) as parallel:
             #     results = parallel(delayed(self.mcts)(learner=participant, max_it=max_it_per_gen, c=c_adjustment) for
             #                        participant in self.simulation_env.participants)
-            #
-            #     print(results[0])
-            #     print(results[1])
-            #
             # for result in results:
             #     for participant in result:
             #         game_trees[participant] = result[participant]['game_tree']
@@ -489,14 +485,20 @@ class Solver():
                                                                     s_now=s_now)
 
            # decoding the actions aleady updates the participants dictionary, not much to do there :-)
+
+            actions = self.simulation_env.participants[participant]['trader']['actions']
+            action_types = [action for action in self.simulation_env.participants[participant]['metrics'][timestamp]]
             actions = self.decode_actions(participant=participant,
                                           a=a_state,
+                                          actions=actions,
+                                          action_types=action_types,
                                           ts=timestamp,
                                           do_print=True)
+            self.simulation_env.participants[participant]['metrics'][timestamp].update(actions)
 
             # print(actions)
             # print(self.simulation_env.participants[participant]['metrics'][timestamp])
-            self.simulation_env.participants[participant]['metrics'][timestamp].update(actions)
+
 
 
 
@@ -573,10 +575,10 @@ class Solver():
 
     # decode actions, placeholder function for more complex action spaces
 
-    def decode_actions(self, participant, a, ts, do_print=False):
+    def decode_actions(self, participant, a, ts, actions, action_types, do_print=False):
+        # actions = self.simulation_env.participants[participant]['trader']['actions']
+        # action_types = [action for action in self.simulation_env.participants[participant]['metrics'][ts]]
         actions_dict = {}
-        actions = self.simulation_env.participants[participant]['trader']['actions']
-        action_types = [action for action in self.simulation_env.participants[participant]['metrics'][ts]]
         a = np.unravel_index(int(a), self.shape_action_space[participant])
         # print(price)
         for action_type in action_types:
@@ -599,9 +601,15 @@ class Solver():
     def evaluate_transition(self, participant, s_now, a):
         # for now the state tuple is: (time)
         timestamp, _ = self.decode_states(s_now) # _ being a placeholder for now
+
+        actions = self.simulation_env.participants[participant]['trader']['actions']
+        action_types = [action for action in self.simulation_env.participants[participant]['metrics'][timestamp]]
         actions = self.decode_actions(participant=participant,
                                       a=a,
+                                      actions=actions,
+                                      action_types=action_types,
                                       ts=timestamp)
+
         self.simulation_env.participants[participant]['metrics'][timestamp].update(actions)
         r, _, __ = self._query_market_get_reward_for_one_tuple(timestamp=timestamp,
                                                                participant=participant,
@@ -748,7 +756,7 @@ class Solver():
 
 if __name__ == '__main__':
     solver = Solver('TB3T')
-    log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=5000, c_adjustment=1, learner_fraction_anneal=True)
+    log, game_trees, participants_dict = solver.MA_MCTS(max_it_per_gen=10, c_adjustment=1, learner_fraction_anneal=True)
 
     plotter = log_plotter(log)
     plotter.plot_prices()

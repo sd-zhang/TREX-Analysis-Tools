@@ -42,17 +42,22 @@ class SimulationEnvironment:
         self.participants[participant]['profile'] = list(p)
 
     def __setup_actions(self, participant):
-        self.participants[participant]['trader']['actions'] = {}
-
         trader = self.participants[participant]['trader']
-        actions = self.participants[participant]['trader']['actions']
+        if 'actions' not in trader:
+            trader['actions'] = {}
+        actions = trader['actions']
 
         # hard code actions for now. Future versions will utilize config file.
-        actions['price'] = tuple(np.linspace(trader['bid_price'], trader['ask_price'], 9))
-        actions['quantity'] = tuple(range(11, 25, 2))
+        if 'price' not in actions or not actions['price']:
+            actions['price'] = tuple(np.linspace(trader['bid_price'], trader['ask_price'], 9))
+
+        if 'quantity' not in actions or not actions['quantity']:
+            actions['quantity'] = tuple(range(11, 25, 2))
 
         # actions['price'] = tuple(np.linspace(trader['bid_price'], trader['ask_price'], 3))
         # actions['quantity'] = tuple(np.array([17]))  # quantity can only be integers
+
+        # print(participant, actions)
 
         if 'storage' in self.participants[participant]:
             actions['battery'] = tuple(np.array(([-17, 0, 17])))

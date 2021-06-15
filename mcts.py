@@ -14,8 +14,8 @@ class MCTS:
                  c_adjustment):
 
         self.learner_id = learner_id
-        self.participants = None
-        self.learner = None
+        self.participants = dict()
+        self.learner = dict()
         self.market = market
         self.reward = reward
         self.time_start = time_start
@@ -42,7 +42,7 @@ class MCTS:
     def update_participants(self, participants):
         # self.participants = json.loads(json.dumps(participants))
         self.participants = copy.deepcopy(participants)
-        self.learner = self.participants[self.learner_id]
+        self.learner.update(self.participants[self.learner_id])
 
     def init_game_tree(self, time_start):
         # We need a data structure to store the 'game tree'

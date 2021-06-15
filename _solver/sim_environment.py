@@ -4,6 +4,7 @@ import pandas as pd
 import dataset
 from _utils.Bess import Storage
 from _utils import utils
+from _utils.utils import process_profile, secure_random
 
 class SimulationEnvironment:
     def __init__(self, config_name):
@@ -21,6 +22,7 @@ class SimulationEnvironment:
             self.__setup_profiles(participant)
             self.__setup_storage(participant)
             self.__setup_actions(participant)
+            self.__setup_initial_actions(participant)
             # self.__setup_metrics(participant)
 
     def __get_config(self, config_name: str,):
@@ -46,16 +48,14 @@ class SimulationEnvironment:
         actions = self.participants[participant]['trader']['actions']
 
         # hard code actions for now. Future versions will utilize config file.
-        actions['price'] = tuple(np.linspace(trader['bid_price'], trader['ask_price'], 5))
-        # actions['price'] = tuple(np.array([0.105]))
-        actions['quantity'] = tuple([13, 15, 17, 19, 21])
-        # actions['quantity'] = tuple(range(13, 23, 2))
+        actions['price'] = tuple(np.linspace(trader['bid_price'], trader['ask_price'], 9))
+        actions['quantity'] = tuple(range(11, 25, 2))
 
-        # actions['price'] = tuple(np.array([trader['bid_price'], trader['ask_price']]))
+        # actions['price'] = tuple(np.linspace(trader['bid_price'], trader['ask_price'], 3))
         # actions['quantity'] = tuple(np.array([17]))  # quantity can only be integers
 
         if 'storage' in self.participants[participant]:
-            actions['battery'] = tuple(np.array(([-20, 0, 20])))
+            actions['battery'] = tuple(np.array(([-17, 0, 17])))
 
     def __setup_storage(self, participant):
         # convert storage params to Storage object
@@ -73,3 +73,45 @@ class SimulationEnvironment:
         #               'participant_id': learner
         # if 'storage' in self.participants[participant]:
         #     metrics['soc'] = {}
+
+    def __setup_initial_actions(self, participant):
+        self.participants[participant]['metrics'] = {}
+        metrics = self.participants[participant]['metrics']
+        # format= {'(timestamp_open, timestamp_close)':
+        #               'quantity: nbr,
+        #               'price': nbr2
+        #               'source': string ('solar')
+        #               'participant_id': learner
+
+        actions = self.participants[participant]['trader']['actions']
+        # for loop something
+        for row in self.participants[participant]['profile']:
+            generation, consumption = process_profile(row,
+                            gen_scale=self.participants[participant]['generation']['scale'],
+                            load_scale=self.participants[participant]['load']['scale'])
+
+            # row['gen'] = gen
+            # row['load'] = consumption
+            net_load = consumption - generation
+            t_start = row['tstamp'] - 60
+            t_end = row['tstamp']
+
+            if net_load > 0:
+                action_type = 'bids'
+            else:
+                action_type = 'asks'
+
+            metrics[t_start] = {action_type:
+                                    {str((t_start, t_end)):
+                                         {'quantity': secure_random.choice(actions['quantity']),
+                                         'price': secure_random.choice(actions['price']),
+                                         'source': 'solar',
+                                         'participant_id': participant,
+                                         },
+                                     }
+                                }
+            if 'storage' in self.participants[participant]:
+                metrics[t_start]['battery'] = {'battery_SoC': None, 'target_flux': None}
+
+            metrics[t_start]['gen'] = generation
+            metrics[t_start]['load'] = consumption

@@ -1,0 +1,132 @@
+{
+    "version": "3.6.1b",
+    "study": {
+      "name": "ae2021-ute3-qbandit-1s-10d-anneal-exp",
+      "description": "",
+      "start_datetime": "2018-07-01 0:0:0",
+      "start_datetime_sequence": "sequential",
+      "timezone": "America/Vancouver",
+//      "days": 0.01,
+      "days": 0.003,  // equivalent to 4 steps
+      "generations": 100,
+      "profiles_db_location": "",
+      "output_db_location": "",
+      "sim_root": ""
+    },
+    "curriculum": {
+      "0": {
+        "learning": false
+      },
+      "1": {
+        "learning": true
+      },
+      "100": {
+        "learning": true,
+        "anneal": {"exploration_factor": [0.98, "multiply"]}
+      }
+    },
+    "server": {
+      "host": "",
+      "port": "5900"
+    },
+    "market": {
+      "id": "",
+      "type": "MicroTE3",
+      "close_steps": 2,
+      "grid": {
+        "price": 0.069,
+        "fee_ratio": 1.1
+      }
+    },
+    "participants": {
+      "R1": {
+        "type": "Residential",
+        "trader": {
+          "track_metrics": true,
+          "type": "qlearn_bandit",
+          "bid_price": 0.07,
+          "ask_price": 0.14,
+          "learning": true,
+          "reward_function": "net_profit",
+          "use_synthetic_profile": "test_profile_1kw_constant_gl",
+          "actions": {
+            "price": [],
+            "quantity": [17]
+          }
+        },
+        "load": {
+          "scale": 0
+        },
+        "generation": {
+          "scale": 1
+        }
+      },
+      "R2": {
+        "type": "Residential",
+        "trader": {
+          "track_metrics": true,
+          "type": "qlearn_bandit",
+          "bid_price": 0.07,
+          "ask_price": 0.14,
+          "learning": true,
+          "reward_function": "net_profit",
+          "use_synthetic_profile": "test_profile_1kw_constant_gl",
+          "actions": {
+            "price": [],
+            "quantity": [17]
+          }
+        },
+        "load": {
+          "scale": 0
+        },
+        "generation": {
+          "scale": 1
+        }
+      },
+      "R3": {
+        "type": "Residential",
+        "trader": {
+          "track_metrics": true,
+          "type": "qlearn_bandit",
+          "bid_price": 0.07,
+          "ask_price": 0.14,
+          "learning": true,
+          "reward_function": "net_profit",
+          "use_synthetic_profile": "test_profile_1kw_constant_gl",
+          "actions": {
+            "price": [],
+            "quantity": []
+          }
+        },
+        "load": {
+          "scale": 10
+        },
+        "generation": {
+          "scale": 0
+        }
+      },
+      "R4": {
+        "type": "Residential",
+        "trader": {
+          "track_metrics": true,
+          "type": "qlearn_bandit",
+          "bid_price": 0.07,
+          "ask_price": 0.14,
+          "learning": true,
+          "reward_function": "net_profit",
+          "use_synthetic_profile": "test_profile_1kw_constant_gl",
+          "actions": {
+            "price": [],
+            "quantity": []
+          }
+        },
+        "load": {
+          "scale": 10
+        },
+        "generation": {
+          "scale": 0
+        }
+      }
+    }
+  }
+  

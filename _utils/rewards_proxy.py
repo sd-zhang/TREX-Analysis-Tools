@@ -28,8 +28,8 @@ class NetProfit_Reward:
 
         total_profit = market_profit + grid_profit + financial_profit
         total_cost = market_cost + grid_cost + financial_cost
-        # reward = float(total_profit - total_cost)/1000
-        reward = total_profit - total_cost
+        reward = float(total_profit - total_cost)/1000
+        # reward = total_profit - total_cost
 
         # if bids or asks:
             # print(bids, asks)

@@ -16,9 +16,6 @@ class Solver():
     def __init__(self, config_name):
         self.simulation_env = SimulationEnvironment(config_name)
         self.reward = Reward()
-        self.action_space = {}
-        self.shape_action_space = {}
-        self.linear_action_space = {}
 
         for participant in self.simulation_env.participants:
             self.__setup_initial_actions(participant)

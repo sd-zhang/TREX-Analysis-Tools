@@ -146,7 +146,7 @@ class Market:
         # # opponents = copy.deepcopy(participants)
         # # opponents.pop(learning_agent_id, None)
         # # print(learning_agent_id)
-        open = dict()
+        open_t = dict()
         learning_agent_times_delivery = list()
         transactions_df = list()
         timestamps = [timestamp]
@@ -159,20 +159,20 @@ class Market:
                     if action in agent_actions:
                         for time_delivery in agent_actions[action]:
                             # print(time_delivery)
-                            if time_delivery not in open:
-                                open[time_delivery] = {}
-                            if action not in open[time_delivery]:
-                                open[time_delivery][action] = []
+                            if time_delivery not in open_t:
+                                open_t[time_delivery] = {}
+                            if action not in open_t[time_delivery]:
+                                open_t[time_delivery][action] = []
 
                             aa = agent_actions[action][time_delivery]
                             aa['participant_id'] = participant_id
-                            open[time_delivery][action].append(copy.deepcopy(aa))
+                            open_t[time_delivery][action].append(copy.deepcopy(aa))
                             if participant_id == learner_id:
                                 learning_agent_times_delivery.append(time_delivery)
 
         for t_d in learning_agent_times_delivery:
-            if 'bids' in open[t_d] and 'asks' in open[t_d]:
-                transactions_df.extend(self.match(open[t_d]['bids'], open[t_d]['asks'], t_d))
+            if 'bids' in open_t[t_d] and 'asks' in open_t[t_d]:
+                transactions_df.extend(self.match(open_t[t_d]['bids'], open_t[t_d]['asks'], t_d))
         return pd.DataFrame(transactions_df)
 
 

@@ -87,10 +87,11 @@ class MCTS:
         action_types = [action for action in self.learner['metrics'][timestamp]]
         a = np.unravel_index(int(a), self.shape_action_space)
         # print(price)
+        # print(a)
         for action_type in action_types:
             if action_type in {'bids', 'asks'}:
                 actions_dict[action_types[0]] = {
-                    str((timestamp-60, timestamp)): {
+                    str((timestamp, timestamp+60)): {
                         'quantity': actions['quantity'][a[1]],
                         'price': actions['price'][a[0]],
                         'source': 'solar',

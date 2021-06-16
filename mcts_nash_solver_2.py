@@ -16,9 +16,6 @@ class Solver():
     def __init__(self, config_name):
         self.simulation_env = SimulationEnvironment(config_name)
         self.reward = Reward()
-        self.action_space = {}
-        self.shape_action_space = {}
-        self.linear_action_space = {}
 
         for participant in self.simulation_env.participants:
             self.__setup_initial_actions(participant)
@@ -129,11 +126,15 @@ class Solver():
             bat_real_flux = 0
 
         # calculate the resulting grid transactions
+
+        generation = self.simulation_env.participants[participant]['metrics'][timestamp]['gen']
+        consumption = self.simulation_env.participants[participant]['metrics'][timestamp]['load']
+
         bids, asks, \
         grid_transactions, \
         financial_transactions = self._extract_deliveries(market_ledger=market_ledger,
-                                                          learning_participant=participant,
-                                                          timestamp=timestamp,
+                                                          generation=generation,
+                                                          consumption=consumption,
                                                           battery=bat_real_flux)
 
         # print(market_transactions)
@@ -154,20 +155,20 @@ class Solver():
 
     # helper for _query_market_get_reward_for_one_tuple, to see what we get or put into grid
     # ToDo: check here to make sure this is right
-    def _extract_deliveries(self, market_ledger, learning_participant, timestamp, battery=0):
+    def _extract_deliveries(self, market_ledger, generation, consumption, battery=0):
         # if market_ledger:
         #     print(market_ledger)
         grid_sell_price = self.simulation_env.configs['market']['grid']['price']
         grid_buy_price = grid_sell_price * (1 + self.simulation_env.configs['market']['grid']['fee_ratio'])
 
-        generation = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['gen']
-        consumption = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['load']
+        # generation = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['gen']
+        # consumption = self.simulation_env.participants[learning_participant]['metrics'][timestamp]['load']
 
         # sort asks from highest to lowest
         # sort bids from lowest to highest
         bids = sorted([sett for sett in market_ledger if sett[0] == 'bid'], key=lambda x: x[2], reverse=True)
         asks = sorted([sett for sett in market_ledger if sett[0] == 'ask'], key=lambda x: x[2], reverse=False)
-        print(bids, asks)
+        # print(bids, asks)
 
         total_bids = sum([bid[1] for bid in bids])
         total_asks = sum([ask[1] for ask in asks])
@@ -341,10 +342,6 @@ class Solver():
             # with Parallel(n_jobs=len(self.simulation_env.participants)) as parallel:
             #     results = parallel(delayed(self.mcts)(learner=participant, max_it=max_it_per_gen, c=c_adjustment) for
             #                        participant in self.simulation_env.participants)
-            #
-            #     print(results[0])
-            #     print(results[1])
-            #
             # for result in results:
             #     for participant in result:
             #         game_trees[participant] = result[participant]['game_tree']
@@ -485,11 +482,20 @@ class Solver():
                                                                     s_now=s_now)
 
            # decoding the actions aleady updates the participants dictionary, not much to do there :-)
+
+            actions = self.simulation_env.participants[participant]['trader']['actions']
+            action_types = [action for action in self.simulation_env.participants[participant]['metrics'][timestamp]]
             actions = self.decode_actions(participant=participant,
                                           a=a_state,
+                                          actions=actions,
+                                          action_types=action_types,
                                           ts=timestamp,
-                                          action_types=[action for action in self.simulation_env.participants[participant]['metrics'][timestamp]],
                                           do_print=True)
+            self.simulation_env.participants[participant]['metrics'][timestamp].update(actions)
+
+            # print(actions)
+            # print(self.simulation_env.participants[participant]['metrics'][timestamp])
+
 
 
 
@@ -566,17 +572,14 @@ class Solver():
 
     # decode actions, placeholder function for more complex action spaces
 
-    def decode_actions(self, participant, a, ts, action_types, do_print=False):
-        # actions_dict = self.simulation_env.participants[self.learner]['metrics'][ts]
-        actions_dict = self.simulation_env.participants[participant]['metrics'][ts]
-        # print(actions_dict)
-
-        actions = self.simulation_env.participants[participant]['trader']['actions']
+    def decode_actions(self, participant, a, ts, actions, action_types, do_print=False):
+        # actions = self.simulation_env.participants[participant]['trader']['actions']
+        # action_types = [action for action in self.simulation_env.participants[participant]['metrics'][ts]]
+        actions_dict = {}
         a = np.unravel_index(int(a), self.shape_action_space[participant])
         # print(price)
         for action_type in action_types:
             if action_type in {'bids', 'asks'}:
-
                 actions_dict[action_types[0]] = {
                     str((ts-60, ts)): {
                         'quantity': actions['quantity'][a[1]],
@@ -587,7 +590,6 @@ class Solver():
                     }
             elif action_type == 'battery':
                 actions_dict['battery']['target_flux'] = actions['battery'][a[-1]]
-
                 actions_dict['battery']['battery_SoC'] = None
         return actions_dict
 
@@ -596,11 +598,16 @@ class Solver():
     def evaluate_transition(self, participant, s_now, a):
         # for now the state tuple is: (time)
         timestamp, _ = self.decode_states(s_now) # _ being a placeholder for now
+
+        actions = self.simulation_env.participants[participant]['trader']['actions']
         action_types = [action for action in self.simulation_env.participants[participant]['metrics'][timestamp]]
         actions = self.decode_actions(participant=participant,
                                       a=a,
-                                      ts=timestamp,
-                                      action_types=action_types)
+                                      actions=actions,
+                                      action_types=action_types,
+                                      ts=timestamp)
+
+        self.simulation_env.participants[participant]['metrics'][timestamp].update(actions)
         r, _, __ = self._query_market_get_reward_for_one_tuple(timestamp=timestamp,
                                                                participant=participant,
                                                                do_print=False)

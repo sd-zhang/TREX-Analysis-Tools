@@ -29,7 +29,7 @@ class log_plotter():
         quant_ax.set_xlabel('Generations')
         quant_ax.set_ylabel('Settled kWh')
         for participant in self.log:
-            quant_ax.plot(self.log[participant]['quant'], label=participant)
+            quant_ax.plot(self.log[participant]['quantity'], label=participant)
 
         quant_fig.legend()
         quant_fig.show()

@@ -28,23 +28,26 @@ class NetProfit_Reward:
 
         total_profit = market_profit + grid_profit + financial_profit
         total_cost = market_cost + grid_cost + financial_cost
-        # reward = float(total_profit - total_cost)/1000
-        reward = total_profit - total_cost
+        reward = float(total_profit - total_cost)/1000
+        # reward = total_profit - total_cost
 
         # if bids or asks:
             # print(bids, asks)
             # print(reward, market_cost, market_profit, financial_cost, financial_profit, grid_cost, grid_profit)
             # print('---')
 
-        bid_quant = sum([t[1] for t in bids]) if bids else 0
-        ask_quant = sum([t[1] for t in asks]) if asks else 0
+        bids_qty = sum([t[1] for t in bids]) if bids else 0
+        asks_qty = sum([t[1] for t in asks]) if asks else 0
         # cost_quant = bid_quant + grid_transactions[0]
         # profit_quant = ask_quant + grid_transactions[2]
 
-        avg_price_sell = market_profit/ask_quant if ask_quant > 0 else np.nan
-        avg_price_buy = market_cost/bid_quant if bid_quant > 0 else np.nan
+        avg_price_sell = market_profit/asks_qty if asks_qty > 0 else np.nan
+        avg_price_buy = market_cost/bids_qty if bids_qty > 0 else np.nan
 
-        return reward, {'avg_ask_price': avg_price_sell, 'avg_bid_price': avg_price_buy}
+        return reward, {'asks_quantity': asks_qty,
+                        'bids_quantity': bids_qty,
+                        'avg_ask_price': avg_price_sell,
+                        'avg_bid_price': avg_price_buy}
 
 # class EconomicAdvantage_Reward:
 #     def __init__(self, timing=None, ledger=None, market_info=None, **kwargs):

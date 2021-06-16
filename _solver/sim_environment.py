@@ -70,7 +70,7 @@ class SimulationEnvironment:
 
     def __setup_metrics(self, participant):
         self.participants[participant]['metrics'] = {}
-        metrics = self.participants[participant]['metrics']
+        # metrics = self.participants[participant]['metrics']
         # format= {'(timestamp_open, timestamp_close)':
         #               'quantity: nbr,
         #               'price': nbr2

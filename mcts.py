@@ -253,11 +253,11 @@ class MCTS:
                                                                    learner_id=self.learner_id,
                                                                    timestamp=timestamp)
         market_ledger = list()
-        quantity = 0
+        # quantity = 0
 
         for index in range(simulated_transactions.shape[0]):
             settlement = simulated_transactions.iloc[index]
-            quantity = settlement['quantity']
+            # quantity = settlement['quantity']
             entry = self.market.simulated_transactions_to_ledger(settlement, self.learner_id)
             if entry is not None:
                 market_ledger.append(entry)
@@ -302,19 +302,24 @@ class MCTS:
                                 battery=real_flux)
 
         # then calculate the reward function
-        rewards, avg_prices = self.reward.calculate(bids=bids,
-                                                    asks=asks,
-                                                    grid_transactions=grid_transactions,
-                                                    financial_transactions=financial_transactions)
+        rewards, metrics = self.reward.calculate(bids=bids,
+                                                 asks=asks,
+                                                 grid_transactions=grid_transactions,
+                                                 financial_transactions=financial_transactions)
         # print('r: ', rewards)
         # if do_print:
         # print('market', market_ledger)
         # print('grid', grid_transactions)
         # print('r', rewards)
         # print('metered_r', simulation_env.participants[learning_participant]['metrics']['reward'][ts])
-        return rewards, quantity, avg_prices
+        bids_qty = metrics.pop('bids_quantity', 0)
+        asks_qty = metrics.pop('asks_quantity', 0)
+        quantity = bids_qty + asks_qty
+
+        return rewards, quantity, metrics
 
     def run(self):
+        # if not self.game_tree:
         self.init_game_tree(self.time_start)
         s_0 = self.encode_states(time=self.time_start - 60)
         for iteration in range(self.max_iterations):

@@ -8,7 +8,7 @@ class Market:
     def __init__(self, configs):
         self.configs = configs
         self.grid_sell_price = self.configs['grid']['price']
-        self.grid_buy_price = self.grid_sell_price * (1 + self.configs['grid']['fee_ratio'])
+        self.grid_buy_price = round(self.grid_sell_price * (1 + self.configs['grid']['fee_ratio']), 4)
 
     def match(self, bids, asks, time_delivery):
         settled = []
@@ -71,27 +71,23 @@ class Market:
         financial_buy = [0, 0]
         financial_sell = [0, 0]
 
-        # net_consumption = consumption - generation
-
         # fulfilling asks is priority
         # sell more than generated
-        if total_asks > generation:
+        if total_asks >= generation:
             # print('ta > g')
-            # deficit_generation = total_asks - generation
             total_asks -= generation
             generation -= generation
-            # print(deficit_generation)
             # if battery discharging
-            # if battery < 0:
-            #     if -battery > total_asks:
-            #         residual_battery = -battery - total_asks
-            #         total_asks -= total_asks
-            #         if residual_battery > consumption:
-            #             grid_sell += residual_battery
-            #         else:
-            #             grid_buy -= residual_battery
-            #     else:
-            #         total_asks += battery
+            if battery < 0:
+                if -battery > total_asks:
+                    residual_battery = -battery - total_asks
+                    total_asks -= total_asks
+                    if residual_battery > consumption:
+                        grid_sell += residual_battery
+                    else:
+                        grid_buy -= residual_battery
+                else:
+                    total_asks += battery
 
             while total_asks:
                 for idx in range(len(asks)):
@@ -115,34 +111,26 @@ class Market:
             generation -= total_asks
             total_asks -= total_asks
 
-            # if total_bids >= consumption:
-            #     total_bids -= consumption
-            #     consumption = 0
-            # else:
-            #     consumption -= total_bids
-            #     total_bids = 0
-
             # residual_consumption = consumption - total_bids
+            # print(generation, total_asks, consumption, total_bids)
             if generation > consumption:
                 generation -= consumption
                 consumption -= consumption
                 grid_sell += generation
-                # print(generation, consumption, grid_sell)
-            elif generation < consumption:
-                consumption -= generation
-                generation -= generation
-                grid_buy += consumption
+            # elif generation < consumption:
+            #     consumption -= generation
+            #     generation -= generation
+            #     grid_buy += max(0, consumption - total_bids)
 
 
         # net_generation = generation - consumption
         # separate bids into physical and financial
-        if total_bids > consumption:
+        if total_bids >= consumption:
             # print('tb > c')
-            bid_deficit = total_bids - consumption + battery
+            bid_deficit = total_bids + generation - consumption + battery
             # print(total_bids, consumption, generation, bid_deficit)
-            if bid_deficit > 0:
+            if bid_deficit and total_bids:
                 while bid_deficit:
-                    # print(learning_participant, total_bids, net_consumption, battery, bid_deficit)
                     for idx in range(len(bids)):
                         bid = list(bids[idx])
                         compensation = min(bid_deficit, bid[1])
@@ -152,14 +140,12 @@ class Market:
                         bid_deficit -= compensation
                         bids[idx] = tuple(bid)
             else:
-                grid_buy -= bid_deficit
+                grid_buy -= min(total_bids, bid_deficit)
 
         # print(grid_buy, self.grid_buy_price, grid_sell, self.grid_sell_price)
         elif total_bids < consumption:
             # print('tb < c')
-            residual_generation = total_asks - generation
-            residual_consumption = consumption - residual_generation - total_bids
-            # print(generation, total_asks, residual_consumption, grid_buy)
+            residual_consumption = consumption - total_bids - generation
 
             if battery < 0:
                 residual_battery = -battery - residual_consumption
@@ -169,9 +155,6 @@ class Market:
                     grid_buy += battery
             else:
                 grid_buy += residual_consumption + battery
-
-        # grid_buy += consumption
-        # grid_sell += generation
 
         grid_transactions = (grid_buy, self.grid_buy_price, grid_sell, self.grid_sell_price)
         return bids, asks, grid_transactions, financial_buy + financial_sell

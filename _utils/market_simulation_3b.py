@@ -2,6 +2,7 @@ from operator import itemgetter
 import itertools
 import copy
 import pandas as pd
+from _utils.utils import secure_random
 import numpy as np
 
 class Market:
@@ -14,6 +15,8 @@ class Market:
         settled = []
         # bids = copy.deepcopy(bids)
         # asks = copy.deepcopy(asks)
+        # order of entry matters when entry prices are the same
+        # whoever enters firt has priority
         bids = sorted([bid for bid in bids if (bid['quantity'] > 0)], key=itemgetter('price'), reverse=True)
         asks = sorted([ask for ask in asks if (ask['quantity'] > 0)], key=itemgetter('price'), reverse=False)
 
@@ -171,14 +174,24 @@ class Market:
         transactions_df = list()
         timestamps = [timestamp]
         # get all actions taken by all agents for a time interval
+
+        # randomize order of entry but prioritize learner
+        # opponents = [participant for participant in list(participants.keys()) if participant != learner_id]
+        # secure_random.shuffle(opponents)
+        # p_list = [learner_id] + opponents
+
+        # randomize order of entry
+        p_list = list(participants.keys())
+        secure_random.shuffle(p_list)
+        # print(participants.keys(), p_list)
         for ts in timestamps:
-            for participant_id in participants:
+            for participant_id in p_list:
                 agent_actions = participants[participant_id]['metrics'][ts]
-                # print(agent_actions)
+                # print(participant_id, agent_actions)
                 for action in ('bids', 'asks'):
                     if action in agent_actions:
                         for time_delivery in agent_actions[action]:
-                            # print(time_delivery)
+                            # print(learner_id, participant_id, time_delivery, agent_actions[action])
                             if time_delivery not in open_t:
                                 open_t[time_delivery] = {}
                             if action not in open_t[time_delivery]:
@@ -192,10 +205,12 @@ class Market:
 
         for t_d in learning_agent_times_delivery:
             if 'bids' in open_t[t_d] and 'asks' in open_t[t_d]:
-                # print(open_t[t_d])
+                # print(t_d, open_t[t_d]['bids'])
+                # random.shuffle((open_t[t_d]['bids']))
+                # random.shuffle((open_t[t_d]['asks']))
                 transactions_df.extend(self.match(open_t[t_d]['bids'], open_t[t_d]['asks'], t_d))
             # print(learner_id, t_d, open_t[t_d])
-        # print(learner_id, transactions_df)
+        # print(learner_id, pd.DataFrame(transactions_df))
         return pd.DataFrame(transactions_df)
 
 
@@ -204,6 +219,8 @@ class Market:
         quantity = market_df_ts['quantity']
         source = market_df_ts['energy_source']
         ledger_entry = None
+
+        # print(market_df_ts)
 
         if market_df_ts['seller_id'] == learner_id or market_df_ts['buyer_id'] == learner_id:
             if learner_id == market_df_ts['seller_id']:
@@ -216,4 +233,5 @@ class Market:
                 action = None
                 price = None
             ledger_entry = (action, quantity, price, source)
+        # print(learner_id, ledger_entry)
         return ledger_entry

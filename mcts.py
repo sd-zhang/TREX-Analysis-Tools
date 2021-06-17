@@ -163,8 +163,8 @@ class MCTS:
 
         if self.game_tree[s_now]['a'][a]['s_next'] != s_next:
             print('encountered non causal state transitions, unforseen and might break code behavior!!!')
-        if self.game_tree[s_now]['a'][a]['r'] != r:
-            print('encountered non cuasal reward, unforseen and might break code behavior!!')
+        # if self.game_tree[s_now]['a'][a]['r'] != r:
+        #     print('encountered non cuasal reward, unforseen and might break code behavior!!')
 
         ts, _ = self.decode_states(s_next)
         self.game_tree[s_now]['a'][a]['n'] += 1

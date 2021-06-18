@@ -49,18 +49,19 @@ class SimulationEnvironment:
 
         # hard code actions for now. Future versions will utilize config file.
         if 'price' not in actions or not actions['price']:
-            actions['price'] = tuple(np.linspace(trader['bid_price'], trader['ask_price'], 9))
+            actions['price'] = tuple(np.linspace(trader['bid_price'], trader['ask_price'], 15))
 
         if 'quantity' not in actions or not actions['quantity']:
-            actions['quantity'] = tuple(range(11, 25, 2))
+            actions['quantity'] = tuple(range(12, 25, 1))
 
         # actions['price'] = tuple(np.linspace(trader['bid_price'], trader['ask_price'], 3))
+        # actions['price'] = tuple(np.array([0.1]))
         # actions['quantity'] = tuple(np.array([17]))  # quantity can only be integers
 
         # print(participant, actions)
 
         if 'storage' in self.participants[participant]:
-            actions['battery'] = tuple(np.array(([-17, 0, 17])))
+            actions['battery'] = tuple(range(-19, 19, 2))
 
     def __setup_storage(self, participant):
         # convert storage params to Storage object

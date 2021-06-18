@@ -119,8 +119,8 @@ class Solver:
         return self.metrics, self.simulation_env.participants
 
 if __name__ == '__main__':
-    solver = Solver('TB3B')
-    log, participants_dict = solver.MA_MCTS(max_it_per_gen=1000, c_adjustment=1, learner_fraction_anneal=True)
+    solver = Solver('TB6')
+    log, participants_dict = solver.MA_MCTS(max_it_per_gen=100000, c_adjustment=1, learner_fraction_anneal=False)
 
     plotter = log_plotter(log)
     plotter.plot_prices()

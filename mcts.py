@@ -99,8 +99,11 @@ class MCTS:
                         }
                     }
             elif action_type == 'battery':
-                actions_dict['battery']['target_flux'] = actions['battery'][a[-1]]
-                actions_dict['battery']['battery_SoC'] = None
+                # print(actions)
+                actions_dict['battery'] = {
+                    'target_flux': actions['battery'][a[-1]],
+                    'battery_SoC': None
+                }
         return actions_dict
 
     def ucb(self, s_now):

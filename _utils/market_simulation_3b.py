@@ -171,11 +171,11 @@ class Market:
         elif total_bids < consumption:
             # print('tb < c')
             residual_consumption = consumption - total_bids - generation
-
             if battery < 0:
                 # print('bd')
                 residual_battery = -battery - residual_consumption
-                if residual_battery > 0:
+                # print(battery, residual_battery, residual_consumption)
+                if residual_battery >= 0:
                     grid_sell += residual_battery
                 else:
                     grid_buy += battery

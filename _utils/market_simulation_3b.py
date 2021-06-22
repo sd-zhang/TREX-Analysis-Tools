@@ -58,7 +58,7 @@ class Market:
         }
         return record
 
-    def deliver(self, market_ledger, generation, consumption, battery=0):
+    def deliver(self, market_ledger, generation, consumption, battery=0, verbose=False):
         # print(market_ledger)
         # sort asks from highest to lowest
         # sort bids from lowest to highest
@@ -178,7 +178,9 @@ class Market:
                 if residual_battery >= 0:
                     grid_sell += residual_battery
                 else:
-                    grid_buy += battery
+                    residual_consumption += battery
+                    battery -= battery
+                    grid_buy += residual_consumption
             else:
                 # print('bc')
                 grid_buy += residual_consumption + battery

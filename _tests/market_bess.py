@@ -158,9 +158,83 @@ check = [bids == [],
          asks == [('ask', 5, 0.1, 'solar')],
          grid_transactions == (5, 0.1449, 0, 0.069),
          financial_transactions == [0, 0, 0, 0]]
-print('c11', check)
+print('c12', check)
 print(bids, asks, grid_transactions, financial_transactions)
 print('-----')
+
+
+# case 13: pure consumer, perfect discharge
+market_ledger = []
+bids, asks, grid_transactions, financial_transactions = test_market.deliver(market_ledger, 0, 17, -17)
+# expected output:
+check = [bids == [],
+         asks == [],
+         grid_transactions == (0, 0.1449, 0, 0.069),
+         financial_transactions == [0, 0, 0, 0]]
+print('c13', check)
+print(bids, asks, grid_transactions, financial_transactions)
+print('-----')
+
+# case 14: pure generator, perfect charge
+market_ledger = []
+bids, asks, grid_transactions, financial_transactions = test_market.deliver(market_ledger, 17, 0, 17)
+# expected output:
+check = [bids == [],
+         asks == [],
+         grid_transactions == (0, 0.1449, 0, 0.069),
+         financial_transactions == [0, 0, 0, 0]]
+print('c14', check)
+print(bids, asks, grid_transactions, financial_transactions)
+print('-----')
+
+# case 12: ask less than generation for generator, charge
+market_ledger = []
+bids, asks, grid_transactions, financial_transactions = test_market.deliver(market_ledger, 0, 16, -17)
+# expected output:
+check = [bids == [],
+         asks == [],
+         grid_transactions == (0, 0.1449, 1, 0.069),
+         financial_transactions == [0, 0, 0, 0]]
+print('c15', check)
+print(bids, asks, grid_transactions, financial_transactions)
+print('-----')
+
+# case 12: ask less than generation for generator, charge
+market_ledger = []
+bids, asks, grid_transactions, financial_transactions = test_market.deliver(market_ledger, 17, 0, 18)
+# expected output:
+check = [bids == [],
+         asks == [],
+         grid_transactions == (1, 0.1449, 0, 0.069),
+         financial_transactions == [0, 0, 0, 0]]
+print('c16', check)
+print(bids, asks, grid_transactions, financial_transactions)
+print('-----')
+
+# case 12: ask less than generation for generator, charge
+market_ledger = []
+bids, asks, grid_transactions, financial_transactions = test_market.deliver(market_ledger, 0, 17, -16)
+# expected output:
+check = [bids == [],
+         asks == [],
+         grid_transactions == (1, 0.1449, 0, 0.069),
+         financial_transactions == [0, 0, 0, 0]]
+print('c17', check)
+print(bids, asks, grid_transactions, financial_transactions)
+print('-----')
+
+# case 12: ask less than generation for generator, charge
+market_ledger = []
+bids, asks, grid_transactions, financial_transactions = test_market.deliver(market_ledger, 18, 0, 17)
+# expected output:
+check = [bids == [],
+         asks == [],
+         grid_transactions == (0, 0.1449, 1, 0.069),
+         financial_transactions == [0, 0, 0, 0]]
+print('c18', check)
+print(bids, asks, grid_transactions, financial_transactions)
+print('-----')
+
 
 #
 # # case 7: perfect bids for a net consumer

@@ -8,7 +8,8 @@ import numpy as np
 import _utils.market_simulation_3b as market
 from _plotter.plotter import log_plotter
 from _utils.rewards_proxy import NetProfit_Reward as Reward
-from _utils.utils import process_profile, secure_random
+from _utils import utils
+from _utils.utils import secure_random
 import mcts
 from joblib import Parallel, delayed
 import matplotlib.pyplot as plt
@@ -18,6 +19,7 @@ import matplotlib.pyplot as plt
 class Solver:
     def __init__(self, config_name):
         self.simulation_env = SimulationEnvironment(config_name)
+        self.study_name = self.simulation_env.configs['study']['name']
         # self.participants = self.simulation_env.participants
         self.reward = Reward()
         self.market = market.Market(self.simulation_env.configs['market'])
@@ -106,6 +108,7 @@ class Solver:
                                    participant_id in active_learning_participants)
             for result in results:
                 for participant_id in result:
+                    # copy tree and metrics back into MCTS instances to deal with parallel processing oddity
                     learning_mcts[participant_id].game_tree.update(result[participant_id]['game_tree'])
                     learning_mcts[participant_id].learner['metrics'].update(result[participant_id]['metrics'])
                     learning_mcts[participant_id].update_policy_from_tree(result[participant_id]['s_0'])
@@ -121,7 +124,7 @@ class Solver:
 if __name__ == '__main__':
     solver = Solver('TB6')
     log, participants_dict = solver.MA_MCTS(max_it_per_gen=100000, c_adjustment=1, learner_fraction_anneal=False)
-
+    utils.dump_zp('logs', solver.study_name, log)
     plotter = log_plotter(log)
     plotter.plot_prices()
     plotter.plot_quantities()

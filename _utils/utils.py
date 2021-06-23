@@ -1,5 +1,11 @@
+import datetime
+import gzip
+import pickle
 import random
 from datetime import datetime
+from pathlib import Path
+import os
+
 import pytz
 from dateutil.parser import parse as timeparse
 
@@ -64,3 +70,36 @@ def energy_to_power(generation, consumption, duration=60, net_load=False):
         return load_avg_kw - gen_avg_kw
     else:
         return gen_avg_kw, load_avg_kw
+
+
+def dump_zp(output_directory, filename, object):
+    if not os.path.exists(output_directory):
+        os.makedirs(output_directory)
+
+    print('Saving...')
+    start_time = datetime.now()
+    file_path = output_directory + '/' + filename + '.zp'
+
+    f = gzip.open(file_path, 'wb')
+    pickle.dump(object, f, protocol=pickle.HIGHEST_PROTOCOL)
+    f.close()
+
+    end_time = datetime.now()
+    elapsed_time = end_time - start_time
+    if elapsed_time.seconds > 0:
+        print('Time:', elapsed_time)
+
+
+def import_zp(input_directory, filename):
+    start_time = datetime.now()
+    file_path = input_directory + '/' + filename + '.zp'
+    f = gzip.open(file_path, 'rb')
+    p_obj = pickle.load(f)
+    f.close()
+
+    end_time = datetime.now()
+    elapsed_time = end_time - start_time
+    if elapsed_time.seconds > 1:
+        print('Loading Time:', elapsed_time)
+
+    return p_obj

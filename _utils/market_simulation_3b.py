@@ -30,6 +30,13 @@ class Market:
             if bid['quantity'] <= 0 or ask['quantity'] <= 0:
                 continue
 
+            # cap bid/ask prices to grid prices
+            if ask['price'] < self.grid_sell_price:
+                continue
+
+            if bid['price'] > self.grid_buy_price:
+                continue
+
             # Settle highest price bids with lowest price asks
             settle_record = self.settle(bid, ask, time_delivery)
             if settle_record:

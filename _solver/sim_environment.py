@@ -9,12 +9,12 @@ from _utils.utils import process_profile, secure_random
 class SimulationEnvironment:
     def __init__(self, config_name):
         self.configs = self.__get_config(config_name)
-
         study = self.configs['study']
         study['start_timestamp'] = utils.timestr_to_timestamp(study['start_datetime'], study['timezone'])
         study['end_timestamp'] = study['start_timestamp'] + int(study['days'] * 1440) * 60
 
-        print((study['end_timestamp'] - study['start_timestamp'])/60, 'steps')
+        print(study['name'])
+        print((study['end_timestamp'] - study['start_timestamp']) / 60, 'steps')
 
         self.participants = self.configs['participants']
 
@@ -22,8 +22,8 @@ class SimulationEnvironment:
             self.__setup_profiles(participant)
             self.__setup_storage(participant)
             self.__setup_actions(participant)
-            self.__setup_initial_actions(participant)
             # self.__setup_metrics(participant)
+            self.__setup_initial_actions(participant)
 
     def __get_config(self, config_name: str,):
         config_file = '_configs/' + config_name + '.json'
@@ -49,19 +49,21 @@ class SimulationEnvironment:
 
         # hard code actions for now. Future versions will utilize config file.
         if 'price' not in actions or not actions['price']:
-            actions['price'] = tuple(np.linspace(trader['bid_price'], trader['ask_price'], 15))
+            # actions['price'] = list(np.linspace(trader['bid_price'], trader['ask_price'], 15))
+            actions['price'] = list(np.linspace(0.05, 0.16, 17))
 
         if 'quantity' not in actions or not actions['quantity']:
-            actions['quantity'] = tuple(range(12, 25, 1))
+            actions['quantity'] = list(range(7, 40, 1))
 
-        # actions['price'] = tuple(np.linspace(trader['bid_price'], trader['ask_price'], 3))
+        # actions['price'] = tuple(np.linspace(trader['bid_price'], trader['ask_price']imp, 3))
         # actions['price'] = tuple(np.array([0.1]))
         # actions['quantity'] = tuple(np.array([17]))  # quantity can only be integers
 
         # print(participant, actions)
 
         if 'storage' in self.participants[participant]:
-            actions['battery'] = tuple(range(-19, 19, 2))
+            if 'battery' not in actions or not actions['battery']:
+                actions['battery'] = tuple(range(-20, 20, 1))
 
     def __setup_storage(self, participant):
         # convert storage params to Storage object
@@ -70,7 +72,8 @@ class SimulationEnvironment:
             self.participants[participant]['storage'] = Storage(**params)
 
     def __setup_metrics(self, participant):
-        self.participants[participant]['metrics'] = {}
+        if 'metrics' not in self.participants[participant]:
+            self.participants[participant]['metrics'] = {}
         # metrics = self.participants[participant]['metrics']
         # format= {'(timestamp_open, timestamp_close)':
         #               'quantity: nbr,
@@ -81,7 +84,9 @@ class SimulationEnvironment:
         #     metrics['soc'] = {}
 
     def __setup_initial_actions(self, participant):
-        self.participants[participant]['metrics'] = {}
+        if 'metrics' not in self.participants[participant]:
+            self.participants[participant]['metrics'] = {}
+
         metrics = self.participants[participant]['metrics']
         # format= {'(timestamp_open, timestamp_close)':
         #               'quantity: nbr,

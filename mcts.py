@@ -280,7 +280,7 @@ class MCTS:
                 if timestamp-60 not in self.learner['metrics']: # FixMe: catch for general shit
                     print('missing ts!!')
                 soc_start = self.learner['metrics'][timestamp-60]['battery']['battery_SoC']
-            target_flux = self.learner['metrics'][timestamp]['battery']['target_flux']
+            target_flux = self.learner['metrics'][timestamp-60]['battery']['target_flux']
 
             # seems like this is error prone somehow?!
             if soc_start is None:  # toDo: catch and fix, once this area is debugged get rid

@@ -89,7 +89,7 @@ class MCTS:
         # print(price)
         # print(a)
         for action_type in action_types:
-            if action_type in {'bids', 'asks'}:
+            if action_type in {'bids', 'asks'} and actions['quantity'][a[1]]:
                 actions_dict[action_types[0]] = {
                     str((timestamp, timestamp+60)): {
                         'quantity': actions['quantity'][a[1]],
@@ -104,6 +104,12 @@ class MCTS:
                     'target_flux': actions['battery'][a[-1]],
                     'battery_SoC': None
                 }
+
+        # generation = self.learner['metrics'][timestamp]['gen']
+        # consumption = self.learner['metrics'][timestamp]['load']
+        # if self.learner_id == 'R1':
+        #     print(self.learner_id, timestamp, generation, consumption)
+
         return actions_dict
 
     def ucb(self, s_now):
@@ -223,7 +229,7 @@ class MCTS:
         timestamp, _ = self.decode_states(s_now)  # _ being a placeholder for now
         actions = self.decode_actions(a=a, timestamp=timestamp)
         self.learner['metrics'][timestamp].update(actions)
-        r, _, __ = self.get_reward_for_transactions(timestamp=timestamp)
+        r, _, _, _, _, _ = self.get_reward_for_transactions(timestamp=timestamp)
         s_next = self.encode_states(time=timestamp)
         return r, s_next
 
@@ -298,11 +304,24 @@ class MCTS:
         generation = self.learner['metrics'][timestamp]['gen']
         consumption = self.learner['metrics'][timestamp]['load']
 
+        # if self.learner_id == "R1":
+        #     print(self.learner_id, timestamp, generation, consumption, soc_start, target_flux, real_flux)
+        #     print(self.learner['metrics'][timestamp - 60]['battery'])
+        #     print(self.learner['metrics'][timestamp - 60])
+
+
         bids, asks, grid_transactions, financial_transactions = \
             self.market.deliver(market_ledger=market_ledger,
                                 generation=generation,
                                 consumption=consumption,
                                 battery=real_flux)
+
+        # if self.learner_id == "R1":
+        #     print(self.learner_id, timestamp, generation, consumption)
+        #     print(soc_start, target_flux, real_flux)
+        #     print(bids, asks, grid_transactions, financial_transactions)
+        #     print(self.learner['metrics'][timestamp - 60]['battery'])
+        #     print(self.learner['metrics'][timestamp - 60])
 
         # then calculate the reward function
         rewards, metrics = self.reward.calculate(bids=bids,
@@ -319,11 +338,16 @@ class MCTS:
         asks_qty = metrics.pop('asks_quantity', 0)
         quantity = bids_qty + asks_qty
 
-        return rewards, quantity, metrics
+        # grid_transactions = (grid_buy, self.grid_buy_price, grid_sell, self.grid_sell_price)
+        # return rewards, quantity, metrics
+        return rewards, metrics, bids_qty, asks_qty, grid_transactions[0], grid_transactions[2]
 
-    def run(self):
+    def run(self, reset_tree=False):
+        # self.init_game_tree(self.time_start)
         # if not self.game_tree:
-        self.init_game_tree(self.time_start)
+        # print(reset_tree)
+        if reset_tree:
+            self.init_game_tree(self.time_start)
         s_0 = self.encode_states(time=self.time_start - 60)
         for iteration in range(self.max_iterations):
             self.one_rollout_and_backup(s_0)
@@ -383,21 +407,52 @@ class MCTS:
     # evaluate current policy of a participant inside a game tree and collects some metrics
     def evaluate_policy(self, do_print=True):
         G = 0
-        cumulative_quantity = 0
+        cumulative_bids_qty = [0, 0]
+        cumulative_asks_qty = [0, 0]
+        cumulative_grid_buy_qty = 0
+        cumulative_grid_sell_qty = 0
+
+        # cumulative_quantity = 0
         avg_prices = {}
         profile = self.learner['profile']
         # for timestamp in timestamps:
         for step in profile[:-1]:
             timestamp = step['tstamp']
-            r, quantity, avg_price_row = self.get_reward_for_transactions(timestamp)
+            # return rewards, quantity, metrics
+            # r, quantity, avg_price_row = self.get_reward_for_transactions(timestamp)
+            # rewards, metrics, bids_qty, asks_qty, grid_transactions[0], grid_transactions[2]
+            r, avg_price_row, bids_qty, asks_qty, grid_buy_qty, grid_sell_qty = \
+                self.get_reward_for_transactions(timestamp)
             for category in avg_price_row:
                 if category not in avg_prices:
                     avg_prices[category] = [avg_price_row[category]]
                 else:
                     avg_prices[category].append(avg_price_row[category])
-
             G += r
-            cumulative_quantity += quantity
+            # cumulative_quantity += quantity
+            cumulative_bids_qty[1] += bids_qty
+            cumulative_asks_qty[1] += asks_qty
+            cumulative_grid_buy_qty += grid_buy_qty
+            cumulative_grid_sell_qty += grid_sell_qty
+
+            metric_ts = self.learner['metrics'][timestamp]
+            metric_ts['exchanged_qty'] = {
+                'bids': bids_qty,
+                'asks': asks_qty,
+                'grid_buy': grid_buy_qty,
+                'grid_sell': grid_sell_qty
+            }
+            # print(timestamp, metric_ts)
+            # metric_ts = ''
+
+            # metric_ts = self.learner['metrics'][timestamp]
+            time_interval = str((timestamp, timestamp + 60))
+            bid_actions = metric_ts['bids'][time_interval]['quantity'] if 'bids' in metric_ts else 0
+            ask_actions = metric_ts['asks'][time_interval]['quantity'] if 'asks' in metric_ts else 0
+            cumulative_bids_qty[0] += bid_actions
+            cumulative_asks_qty[0] += ask_actions
+            # print(bid_actions)
+
         for category in avg_prices:
             num_nans = np.count_nonzero(np.isnan(avg_prices[category]))
             if num_nans != len(avg_prices[category]):
@@ -407,7 +462,17 @@ class MCTS:
 
         if do_print:
             print('Policy of agent ', self.learner_id, ' achieves the following return: ', G)
-            print('settled quantity is: ', cumulative_quantity)
+            # print('actions taken:', [action for action in self.learner['metrics'][timestamp]])
+
+            stats = [
+                'quantities (b, a, gb, gs): ',
+                str(cumulative_bids_qty[0]) + '|' + str(cumulative_bids_qty[1]),
+                str(cumulative_asks_qty[0]) + '|' + str(cumulative_asks_qty[1]),
+                cumulative_grid_buy_qty,
+                cumulative_grid_sell_qty
+                ]
+
+            print(*stats)
             print('avg prices: ', avg_prices)
             print('.........................................')
-        return G, cumulative_quantity, avg_prices
+        return G, cumulative_bids_qty[1] + cumulative_asks_qty[1], avg_prices

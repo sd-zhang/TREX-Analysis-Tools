@@ -119,8 +119,6 @@ class Solver:
                     learning_mcts[participant_id].update_policy_from_tree(result[participant_id]['s_0'])
 
             for participant_id in learning_participants:
-
-
                 G, cumulative_quantity, avg_prices = learning_mcts[participant_id].evaluate_policy()
                 self.update_metrics(participant_id, G, cumulative_quantity, avg_prices)
                 self.simulation_env.participants[participant_id]['metrics'].update(
@@ -129,9 +127,15 @@ class Solver:
         return self.metrics, self.simulation_env.participants
 
 if __name__ == '__main__':
-    solver = Solver('TB7')
-    log, participants_dict = solver.MA_MCTS(max_it_per_gen=1000, c_adjustment=1, learner_fraction_anneal=False)
-    utils.dump_zp('logs', solver.study_name, log)
+    solver = Solver('TB6C')
+    log, participants = solver.MA_MCTS(max_it_per_gen=20000, c_adjustment=1, learner_fraction_anneal=False)
+
+    results = {
+        'metrics': log,
+        'participants': participants
+    }
+
+    utils.dump_zp('logs', solver.study_name, results)
     plotter = log_plotter(log)
     plotter.plot_prices()
     plotter.plot_quantities()

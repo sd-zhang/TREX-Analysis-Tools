@@ -15,9 +15,11 @@ def timestamp_to_local(epoch_ts, timezone):
     """Converts UNIX timestamp to local datetime object"""
     return datetime.fromtimestamp(epoch_ts, pytz.timezone(timezone))
 
+
 def timestr_to_timestamp(time_string:str, timezone:str):
     timestamp = pytz.timezone(timezone).localize(timeparse(time_string))
     return int(timestamp.timestamp())
+
 
 def process_profile(row, gen_scale=1, load_scale=1):
     """
@@ -59,6 +61,7 @@ def process_profile(row, gen_scale=1, load_scale=1):
         generation = int(round(gen_scale * row['solar+'], 0))
         return generation, consumption
     return 0, 0
+
 
 def energy_to_power(generation, consumption, duration=60, net_load=False):
     # convert from energy (Wh) to average power during interval (s) to kW

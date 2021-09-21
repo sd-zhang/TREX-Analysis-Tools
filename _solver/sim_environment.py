@@ -9,12 +9,12 @@ from _utils.utils import process_profile, secure_random
 class SimulationEnvironment:
     def __init__(self, config_name):
         self.configs = self.__get_config(config_name)
-
         study = self.configs['study']
         study['start_timestamp'] = utils.timestr_to_timestamp(study['start_datetime'], study['timezone'])
         study['end_timestamp'] = study['start_timestamp'] + int(study['days'] * 1440) * 60
 
-        print((study['end_timestamp'] - study['start_timestamp'])/60, 'steps')
+        print(study['name'])
+        print((study['end_timestamp'] - study['start_timestamp']) / 60, 'steps')
 
         self.participants = self.configs['participants']
 
@@ -22,8 +22,8 @@ class SimulationEnvironment:
             self.__setup_profiles(participant)
             self.__setup_storage(participant)
             self.__setup_actions(participant)
-            self.__setup_initial_actions(participant)
             # self.__setup_metrics(participant)
+            self.__setup_initial_actions(participant)
 
     def __get_config(self, config_name: str,):
         config_file = '_configs/' + config_name + '.json'
@@ -40,6 +40,7 @@ class SimulationEnvironment:
         table = db[table_name]
         p = table.find(table.table.columns.tstamp.between(study['start_timestamp'], study['end_timestamp']))
         self.participants[participant]['profile'] = list(p)
+        # print(self.participants[participant]['profile'][0])
 
     def __setup_actions(self, participant):
         trader = self.participants[participant]['trader']
@@ -47,21 +48,44 @@ class SimulationEnvironment:
             trader['actions'] = {}
         actions = trader['actions']
 
+        # crawl through the profile and figure out the maximum quantity to avoid too many "equivalent" states
+        max_generation = 0
+        max_consumption = 0
+        for row in self.participants[participant]['profile']:
+            generation, consumption = process_profile(row,
+                            gen_scale=self.participants[participant]['generation']['scale'],
+                            load_scale=self.participants[participant]['load']['scale'])
+            max_generation = max(max_generation, generation)
+            max_consumption = max(max_consumption, consumption)
+        max_qty = max(max_generation, max_consumption)
+
         # hard code actions for now. Future versions will utilize config file.
         if 'price' not in actions or not actions['price']:
-            # actions['price'] = tuple(np.linspace(trader['bid_price'], trader['ask_price'], 30))
-            actions['price'] = tuple(np.linspace(0.05, 0.2, 30))
-        if 'quantity' not in actions or not actions['quantity']:
-            actions['quantity'] = tuple(range(1, 100, 2))
+            # actions['price'] = list(np.linspace(trader['bid_price'], trader['ask_price'], 15))
+            # actions['price'] = list(np.round(np.linspace(0.05, 0.16, 15), 5))
 
-        # actions['price'] = tuple(np.linspace(trader['bid_price'], trader['ask_price'], 3))
+            # limit prices to be between grid
+            grid_price_sell = self.configs['market']['grid']['price']
+            grid_price_buy = grid_price_sell * (1 + self.configs['market']['grid']['fee_ratio'])
+            actions['price'] = list(np.round(np.linspace(grid_price_sell, grid_price_buy, 9), 5))
+
+        if 'quantity' not in actions or not actions['quantity']:
+            actions['quantity'] = list(range(0, max_qty+1, 1))
+
+        # actions['price'] = tuple(np.linspace(trader['bid_price'], trader['ask_price']imp, 3))
         # actions['price'] = tuple(np.array([0.1]))
         # actions['quantity'] = tuple(np.array([17]))  # quantity can only be integers
 
         # print(participant, actions)
 
         if 'storage' in self.participants[participant]:
-            actions['battery'] = tuple(range(-19, 19, 2))
+            if 'battery' not in actions or not actions['battery']:
+                # actions['battery'] = tuple(range(-20, 20, 1))
+                actions['battery'] = list(range(-max_qty, max_qty+1, 1))
+
+                # temporarily disable price and quantity to speed up self consumption sim
+                # actions['price'] = [0]
+                # actions['quantity'] = [0]
 
     def __setup_storage(self, participant):
         # convert storage params to Storage object
@@ -70,7 +94,8 @@ class SimulationEnvironment:
             self.participants[participant]['storage'] = Storage(**params)
 
     def __setup_metrics(self, participant):
-        self.participants[participant]['metrics'] = {}
+        if 'metrics' not in self.participants[participant]:
+            self.participants[participant]['metrics'] = {}
         # metrics = self.participants[participant]['metrics']
         # format= {'(timestamp_open, timestamp_close)':
         #               'quantity: nbr,
@@ -81,7 +106,9 @@ class SimulationEnvironment:
         #     metrics['soc'] = {}
 
     def __setup_initial_actions(self, participant):
-        self.participants[participant]['metrics'] = {}
+        if 'metrics' not in self.participants[participant]:
+            self.participants[participant]['metrics'] = {}
+
         metrics = self.participants[participant]['metrics']
         # format= {'(timestamp_open, timestamp_close)':
         #               'quantity: nbr,
@@ -101,6 +128,8 @@ class SimulationEnvironment:
             net_load = consumption - generation
             t_start = row['tstamp'] - 60
             t_end = row['tstamp']
+
+            # print(participant, t_end, generation, consumption)
 
             if net_load > 0:
                 action_type = 'bids'

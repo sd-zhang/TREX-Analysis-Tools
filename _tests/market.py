@@ -224,7 +224,7 @@ print('-----')
 # expected output:
 # [] [('ask', 10, 0.1, 'solar')] (0, 0.14490000000000003, 10, 0.069) [0, 0, 0, 0]
 
-# case 16: asks less than generated for a net producer, net generation < ask
+# case 18: asks less than generated for a net producer, net generation < ask
 market_ledger = []
 bids, asks, grid_transactions, financial_transactions = test_market.deliver(market_ledger, 1, 10)
 check = [bids == [],
@@ -237,7 +237,7 @@ print('-----')
 # expected output:
 # [] [('ask', 10, 0.1, 'solar')] (0, 0.14490000000000003, 10, 0.069) [0, 0, 0, 0]
 
-# case 16: asks less than generated for a net producer, net generation < ask
+# case 19: asks less than generated for a net producer, net generation < ask
 market_ledger = []
 bids, asks, grid_transactions, financial_transactions = test_market.deliver(market_ledger, 0, 0)
 check = [bids == [],

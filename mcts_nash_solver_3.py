@@ -6,13 +6,14 @@ import pandas as pd
 from _solver.sim_environment import SimulationEnvironment
 import numpy as np
 import _utils.market_simulation_3b as market
-from _plotter.plotter import log_plotter
+
 from _utils.rewards_proxy import NetProfit_Reward as Reward
 from _utils import utils
 from _utils.utils import secure_random
 import mcts
 from joblib import Parallel, delayed
-import matplotlib.pyplot as plt
+from _plotter.plotter import log_plotter
+# import matplotlib.pyplot as plt
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -25,7 +26,7 @@ class Solver:
         self.market = market.Market(self.simulation_env.configs['market'])
         self.metrics = dict()
 
-    def update_metrics(self, participant, G, quantity, avg_prices):
+    def update_metrics(self, participant, G, quantity, avg_prices, metrics_history):
         # format log
         if 'G' not in self.metrics[participant]:
             self.metrics[participant]['G'] = [G]
@@ -45,6 +46,10 @@ class Solver:
                     self.metrics[participant]['avg_prices'][category] = [avg_prices[category]]
                 else:
                     self.metrics[participant]['avg_prices'][category].append(avg_prices[category])
+        if 'history' not in self.metrics[participant]:
+            self.metrics[participant]['history'] = [metrics_history]
+        else:
+            self.metrics[participant]['history'].append(metrics_history)
 
 # run MCTS for every agent in the game tree...
     def MA_MCTS(self,
@@ -103,8 +108,13 @@ class Solver:
 
             # parallel execution code
             print('MCTS gen', gen)
+            reset_tree = False
+            if not gen % 1:
+                reset_tree = True
+                print('trees reset')
+
             with Parallel(n_jobs=len(active_learning_participants)) as parallel:
-                results = parallel(delayed(learning_mcts[participant_id].run)() for
+                results = parallel(delayed(learning_mcts[participant_id].run)(reset_tree) for
                                    participant_id in active_learning_participants)
             for result in results:
                 for participant_id in result:
@@ -115,19 +125,26 @@ class Solver:
 
             for participant_id in learning_participants:
                 G, cumulative_quantity, avg_prices = learning_mcts[participant_id].evaluate_policy()
-                self.update_metrics(participant_id, G, cumulative_quantity, avg_prices)
+                self.update_metrics(participant_id, G, cumulative_quantity, avg_prices, learning_mcts[participant_id].learner['metrics'])
                 self.simulation_env.participants[participant_id]['metrics'].update(
                     learning_mcts[participant_id].learner['metrics'])
 
         return self.metrics, self.simulation_env.participants
 
 if __name__ == '__main__':
-    #
-    solver = Solver('TB3-1D_100S')
-    log, participants_dict = solver.MA_MCTS(max_it_per_gen=15000,
-                                            c_adjustment=1,
-                                            learner_fraction_anneal=False)
-    utils.dump_zp('logs', solver.study_name, log)
+    solver = Solver('TB6C')
+    log, participants = solver.MA_MCTS(
+        max_it_per_gen=10000,
+        c_adjustment=1,
+        learner_fraction_anneal=False)
+
+    output = {
+        'metrics': log,
+        'participants': participants
+    }
+
+    utils.dump_zp('logs', solver.study_name, output)
+
     plotter = log_plotter(log)
     plotter.plot_prices()
     plotter.plot_quantities()

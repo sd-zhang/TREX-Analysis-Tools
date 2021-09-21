@@ -30,13 +30,24 @@ class Market:
             if bid['quantity'] <= 0 or ask['quantity'] <= 0:
                 continue
 
+            # cap bid/ask prices to grid prices
+            if ask['price'] < self.grid_sell_price:
+                continue
+
+            if bid['price'] > self.grid_buy_price:
+                continue
+
             # Settle highest price bids with lowest price asks
             settle_record = self.settle(bid, ask, time_delivery)
             if settle_record:
                 settled.append(settle_record)
                 bid['quantity'] -= settle_record['quantity']
                 ask['quantity'] -= settle_record['quantity']
-        return settled
+        unsettled = {
+            'bids': bids,
+            'asks': asks
+        }
+        return settled, unsettled
 
     def settle(self, bid: dict, ask: dict, time_delivery: tuple):
         # only proceed to settle if settlement quantity is positive
@@ -190,7 +201,7 @@ class Market:
 
 
     # simulated market for participants, giving back learning agent's settlements, optionally for a specific timestamp
-    def simulate_transactions(self, participants: dict, learner_id:str, timestamp:int):
+    def simulate_transactions(self, participants: dict, learner_id:str, timestamp:int, learner_bias=0):
         # learning_agent = participants[learner_id]
         # # opponents = copy.deepcopy(participants)
         # # opponents.pop(learning_agent_id, None)
@@ -199,17 +210,22 @@ class Market:
         learning_agent_times_delivery = list()
         transactions_df = list()
         timestamps = [timestamp]
-        # get all actions taken by all agents for a time interval
 
-        # randomize order of entry but prioritize learner
-        # opponents = [participant for participant in list(participants.keys()) if participant != learner_id]
-        # secure_random.shuffle(opponents)
-        # p_list = [learner_id] + opponents
+        if learner_bias:
+            # randomize order of entry but prioritize learner
+            opponents = [participant for participant in list(participants.keys()) if participant != learner_id]
+            secure_random.shuffle(opponents)
+            if learner_bias > 0:
+                p_list = [learner_id] + opponents
+            elif learner_bias < 0:
+                p_list = opponents + [learner_id]
+        else:
+            # randomize order of entry
+            p_list = list(participants.keys())
+            secure_random.shuffle(p_list)
 
-        # randomize order of entry
-        p_list = list(participants.keys())
-        secure_random.shuffle(p_list)
         # print(participants.keys(), p_list)
+        # get all actions taken by all agents for a time interval
         for ts in timestamps:
             for participant_id in p_list:
                 agent_actions = participants[participant_id]['metrics'][ts]
@@ -234,7 +250,8 @@ class Market:
                 # print(t_d, open_t[t_d]['bids'])
                 # random.shuffle((open_t[t_d]['bids']))
                 # random.shuffle((open_t[t_d]['asks']))
-                transactions_df.extend(self.match(open_t[t_d]['bids'], open_t[t_d]['asks'], t_d))
+                settled, unsettled = self.match(open_t[t_d]['bids'], open_t[t_d]['asks'], t_d)
+                transactions_df.extend(settled)
             # print(learner_id, t_d, open_t[t_d])
         # print(learner_id, pd.DataFrame(transactions_df))
         return pd.DataFrame(transactions_df)

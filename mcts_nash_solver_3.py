@@ -144,9 +144,50 @@ if __name__ == '__main__':
     }
 
     utils.dump_zp('logs', solver.study_name, output)
+
     plotter = log_plotter(log)
     plotter.plot_prices()
     plotter.plot_quantities()
     plotter.plot_returns()
     log_plotter(log)
     print('fin')
+    del solver, plotter
+
+    solver = Solver('TB3-2.5D_1S')
+    log, participants_dict = solver.MA_MCTS(max_it_per_gen=15000,
+                                            c_adjustment=1,
+                                            learner_fraction_anneal=False)
+    utils.dump_zp('logs', solver.study_name, log)
+    plotter = log_plotter(log)
+    plotter.plot_prices()
+    plotter.plot_quantities()
+    plotter.plot_returns()
+    log_plotter(log)
+    print('fin')
+    del solver, plotter
+
+    solver = Solver('TB3-5D_1S')
+    log, participants_dict = solver.MA_MCTS(max_it_per_gen=15000,
+                                            c_adjustment=1,
+                                            learner_fraction_anneal=False)
+    utils.dump_zp('logs', solver.study_name, log)
+    plotter = log_plotter(log)
+    plotter.plot_prices()
+    plotter.plot_quantities()
+    plotter.plot_returns()
+    log_plotter(log)
+    print('fin')
+    del solver, plotter
+
+    solver = Solver('TB3-10D_1S')
+    log, participants_dict = solver.MA_MCTS(max_it_per_gen=15000,
+                                            c_adjustment=1,
+                                            learner_fraction_anneal=False)
+    utils.dump_zp('logs', solver.study_name, log)
+    plotter = log_plotter(log)
+    plotter.plot_prices()
+    plotter.plot_quantities()
+    plotter.plot_returns()
+    log_plotter(log)
+    print('fin')
+    del solver, plotter

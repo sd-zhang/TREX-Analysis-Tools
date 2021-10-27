@@ -3,6 +3,7 @@ import gzip
 import pickle
 import random
 from datetime import datetime
+
 from pathlib import Path
 import os
 
@@ -106,3 +107,11 @@ def import_zp(input_directory, filename):
         print('Loading Time:', elapsed_time)
 
     return p_obj
+
+def load_config(config_name: str):
+    import commentjson
+    config_file = '_configs/' + config_name + '.json'
+    # config_file = 'E:/TREX-Analysis-Tools/_configs/TB3C.json'
+    with open(config_file) as f:
+        config = commentjson.load(f)
+    return config

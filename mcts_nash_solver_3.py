@@ -134,25 +134,24 @@ class Solver:
         return self.metrics, self.simulation_env.participants
 
 if __name__ == '__main__':
-    solver = Solver('TB3A')
+    config_name = 'TB5C'
     log, participants = solver.MA_MCTS(
         max_it_per_gen=1000,
         c_adjustment=1,
         learner_fraction_anneal=False,
-        hard_reset_game_tree=True,
-        )
+        hard_reset_game_tree=True,)
 
     output = {
+        'config': utils.load_config(config_name),
         'metrics': log,
         'participants': participants
     }
 
     utils.dump_zp('logs', solver.study_name, output)
-
-    plotter = log_plotter(log, experiment_name='Hard Tree Resets 1000Its 1000Gens TB3_Zero')
+    plotter = log_plotter(output['metrics'], experiment_name='Hard Tree Resets 1000Its 1000Gens TB3_Zero')
     plotter.plot_prices()
     plotter.plot_quantities()
     plotter.plot_returns()
     log_plotter(log)
     print('fin')
-    # del solver, plotter
+

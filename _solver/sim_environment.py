@@ -25,7 +25,7 @@ class SimulationEnvironment:
             # self.__setup_metrics(participant)
             self.__setup_initial_actions(participant)
 
-    def __get_config(self, config_name: str,):
+    def __get_config(self, config_name: str):
         config_file = '_configs/' + config_name + '.json'
         # config_file = 'E:/TREX-Analysis-Tools/_configs/TB3C.json'
         with open(config_file) as f:

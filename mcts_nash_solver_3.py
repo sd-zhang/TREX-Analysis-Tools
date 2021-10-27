@@ -56,6 +56,7 @@ class Solver:
                 max_it_per_gen,
                 c_adjustment,
                 learner_fraction_anneal=False, #Experimental feature that might help calm violence of conversion
+                hard_reset_game_tree=False
                 ):
         generations = self.simulation_env.configs['study']['generations']
         learning_participants = [participant for participant in self.simulation_env.participants if
@@ -107,15 +108,16 @@ class Solver:
             #     learning_mcts[participant_id].update_policy_from_tree(result[participant_id]['s_0'])
 
             # parallel execution code
+            #ToDo: follow this a little bit to see how this works now
             print('MCTS gen', gen)
-            reset_tree = False
-            if not gen % 1:
+            reset_tree = hard_reset_game_tree
+            if gen == 0: #might wanna comment this out
                 reset_tree = True
-                print('trees reset')
 
             with Parallel(n_jobs=len(active_learning_participants)) as parallel:
                 results = parallel(delayed(learning_mcts[participant_id].run)(reset_tree) for
                                    participant_id in active_learning_participants)
+
             for result in results:
                 for participant_id in result:
                     # copy tree and metrics back into MCTS instances to deal with parallel processing oddity
@@ -133,10 +135,11 @@ class Solver:
 
 if __name__ == '__main__':
     config_name = 'TB5C'
-    solver = Solver(config_name)
     log, participants = solver.MA_MCTS(
-        max_it_per_gen=10000,
-        c_adjustment=1)
+        max_it_per_gen=1000,
+        c_adjustment=1,
+        learner_fraction_anneal=False,
+        hard_reset_game_tree=True,)
 
     output = {
         'config': utils.load_config(config_name),
@@ -145,9 +148,10 @@ if __name__ == '__main__':
     }
 
     utils.dump_zp('logs', solver.study_name, output)
-    plotter = log_plotter(output['metrics'])
+    plotter = log_plotter(output['metrics'], experiment_name='Hard Tree Resets 1000Its 1000Gens TB3_Zero')
     plotter.plot_prices()
     plotter.plot_quantities()
     plotter.plot_returns()
     log_plotter(log)
     print('fin')
+

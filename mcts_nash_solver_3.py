@@ -132,19 +132,20 @@ class Solver:
         return self.metrics, self.simulation_env.participants
 
 if __name__ == '__main__':
-    solver = Solver('TB6C')
+    config_name = 'TB5C'
+    solver = Solver(config_name)
     log, participants = solver.MA_MCTS(
         max_it_per_gen=10000,
-        c_adjustment=1,
-        learner_fraction_anneal=False)
+        c_adjustment=1)
 
     output = {
+        'config': utils.load_config(config_name),
         'metrics': log,
         'participants': participants
     }
 
     utils.dump_zp('logs', solver.study_name, output)
-    plotter = log_plotter(log)
+    plotter = log_plotter(output['metrics'])
     plotter.plot_prices()
     plotter.plot_quantities()
     plotter.plot_returns()

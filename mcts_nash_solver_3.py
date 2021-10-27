@@ -13,6 +13,7 @@ from _utils.utils import secure_random
 import mcts
 from joblib import Parallel, delayed
 from _plotter.plotter import log_plotter
+from _plotter.plot_policy import policy_plotter
 # import matplotlib.pyplot as plt
 
 
@@ -134,14 +135,14 @@ class Solver:
         return self.metrics, self.simulation_env.participants
 
 if __name__ == '__main__':
-    config_name = 'TB7'
+    config_name = 'TB6C'
     solver = Solver(config_name)
     log, participants = solver.MA_MCTS(
         max_it_per_gen=1000,
         c_adjustment=1,
         learner_fraction_anneal=False,
         hard_reset_game_tree=True,)
-
+    print(solver.study_name)
     output = {
         'config': utils.load_config(config_name),
         'metrics': log,
@@ -149,10 +150,12 @@ if __name__ == '__main__':
     }
 
     utils.dump_zp('logs', solver.study_name, output)
-    plotter = log_plotter(output['metrics'], experiment_name='Hard Tree Resets 1000Its 1000Gens TB3_Zero')
+    policy_plotter(study_name=solver.study_name)
+
+    plotter = log_plotter(output['metrics'], experiment_name='Hard Tree Resets 1000Its 100Gens TB6C')
     plotter.plot_prices()
     plotter.plot_quantities()
-    plotter.plot_returns()
+    # plotter.plot_returns()
     log_plotter(log)
     print('fin')
 

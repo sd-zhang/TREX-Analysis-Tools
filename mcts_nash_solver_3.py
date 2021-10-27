@@ -134,7 +134,8 @@ class Solver:
         return self.metrics, self.simulation_env.participants
 
 if __name__ == '__main__':
-    config_name = 'TB5C'
+    config_name = 'TB7'
+    solver = Solver(config_name)
     log, participants = solver.MA_MCTS(
         max_it_per_gen=1000,
         c_adjustment=1,

@@ -4,13 +4,16 @@ import numpy as np
 # plots the log
 class log_plotter():
 
-    def __init__(self, log):
+    def __init__(self, log, experiment_name=None, save_plots=True):
         self.log = log
+        self.experiment_name = experiment_name
+        self.save_plots = True
 
-    def plot_returns(self, export=False):
+    def plot_returns(self):
         num_agents = len([participant for participant in self.log])
         fig, ax = plt.subplots(num_agents, 1, sharex=True)
         ax[0].set_xlabel('Generations')
+
 
         plot_nbr = 0
         for participant in self.log:
@@ -18,28 +21,36 @@ class log_plotter():
             ax[plot_nbr].plot(self.log[participant]['G'], label=participant)
             plot_nbr +=1
 
+        if self.experiment_name is not None:
+            fig.suptitle(self.experiment_name)
         fig.legend()
         fig.tight_layout()
+        if self.save_plots:
+            plt.savefig(self.experiment_name + '_returns.png')
         fig.show()
         # calculattes and plots returns
         # optionally exports the plot as png for use externally
         return False
 
-    def plot_quantities(self, export=False):
+    def plot_quantities(self):
         fig, ax = plt.subplots()
         ax.set_xlabel('Generations')
         ax.set_ylabel('Settled kWh')
         for participant in self.log:
             ax.plot(self.log[participant]['quantity'], label=participant)
 
+        if self.experiment_name is not None:
+            fig.suptitle(self.experiment_name)
         fig.legend()
         fig.tight_layout()
+        if self.save_plots:
+            plt.savefig(self.experiment_name + '_quantities.png')
         fig.show()
         # calculattes and plots quantities
         # optionally exports the plot as png for use externally
         return False
 
-    def plot_prices(self, export=False):
+    def plot_prices(self):
         fig, (bid_ax, ask_ax) = plt.subplots(2, 1, sharex=True)
         bid_ax.set_xlabel('Generations')
         bid_ax.set_ylabel('Bid Prices')
@@ -51,10 +62,11 @@ class log_plotter():
             asks = self.log[participant]['avg_prices']['avg_ask_price']
             ask_ax.plot(asks)
 
+        if self.experiment_name is not None:
+            fig.suptitle(self.experiment_name)
         fig.legend()
         fig.tight_layout()
+        if self.save_plots:
+            plt.savefig(self.experiment_name + '_prices.png')
         fig.show()
-        return False
-
-    def __export_plot(self, fig):
         return False

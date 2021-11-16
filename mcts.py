@@ -105,11 +105,6 @@ class MCTS:
                     'battery_SoC': None
                 }
 
-        # generation = self.learner['metrics'][timestamp]['gen']
-        # consumption = self.learner['metrics'][timestamp]['load']
-        # if self.learner_id == 'R1':
-        #     print(self.learner_id, timestamp, generation, consumption)
-
         return actions_dict
 
     def ucb(self, s_now):
@@ -196,6 +191,7 @@ class MCTS:
         s_now = s_now
 
         # we're traversing the tree till we hit bottom
+        #ToDo: change pieces of code so we can actually do this with a persistent tree?
         while not finished:
             trajectory.append((s_now, action))
             s_now, action, finished = self.step(s_now=s_now)
@@ -342,12 +338,22 @@ class MCTS:
         # return rewards, quantity, metrics
         return rewards, metrics, bids_qty, asks_qty, grid_transactions[0], grid_transactions[2]
 
+    #ToDo: make sure we reset the node visit numbers
+    # make reset tree to reset, make it a string
+    # default is None
+    # 'tree' means we reset the whole tree
+    # 'visits' means we reset visits (for tree persistence)
+    # add a disclaimer if the thing
     def run(self, reset_tree=False):
         # self.init_game_tree(self.time_start)
         # if not self.game_tree:
         # print(reset_tree)
         if reset_tree:
+            print('completely reset game tree')
             self.init_game_tree(self.time_start)
+        else:
+            print('reset visits for the game tree')
+            self.reset_visits()
         s_0 = self.encode_states(time=self.time_start - 60)
         for iteration in range(self.max_iterations):
             self.one_rollout_and_backup(s_0)
@@ -357,6 +363,18 @@ class MCTS:
             's_0': s_0,
             'metrics': self.learner['metrics']
         }}
+
+    def reset_visits(self):
+        print('.')
+        for state in self.game_tree:
+            # reset the visits to all s/a pairs to 1
+            # reset the visits to all states to num_actions
+            n_actions = 0
+            for action in self.game_tree[state]['a']:
+                self.game_tree[state]['a'][action]['n'] = 1
+                n_actions += 1
+            self.game_tree[state]['N'] = n_actions
+
 
     def greedy_policy(self, s_now):
         q = []
@@ -375,7 +393,8 @@ class MCTS:
         s_now = self.game_tree[s_now]['a'][a_state]['s_next']
         return a_state, s_now
 
-    # ToDo: seems like this doesnt do what it is supposed to anymore? actions do not get saved anywhere....
+    # ToDo: seems like this doesnt do what it is supposed to anymore?
+    #  actions do not get saved anywhere....
     # update the policy from the game tree
     def update_policy_from_tree(self, s_0):
         # the idea is to follow a greedy policy from S_0 as long as we can and then switch over to the default rollout policy

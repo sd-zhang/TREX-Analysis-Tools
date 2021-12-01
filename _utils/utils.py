@@ -82,7 +82,7 @@ def dump_zp(output_directory, filename, object):
 
     print('Saving...')
     start_time = datetime.now()
-    file_path = output_directory + '/' + filename + '.zp'
+    file_path = os.path.join(output_directory, filename + '.zp')
 
     f = gzip.open(file_path, 'wb')
     pickle.dump(object, f, protocol=pickle.HIGHEST_PROTOCOL)
@@ -96,7 +96,7 @@ def dump_zp(output_directory, filename, object):
 
 def import_zp(input_directory, filename):
     start_time = datetime.now()
-    file_path = input_directory + '/' + filename + '.zp'
+    file_path = os.path.join(input_directory, filename + '.zp')
     f = gzip.open(file_path, 'rb')
     p_obj = pickle.load(f)
     f.close()

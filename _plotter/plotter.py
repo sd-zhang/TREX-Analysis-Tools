@@ -1,13 +1,17 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 # plots the log
 class log_plotter():
 
-    def __init__(self, log, experiment_name=None, save_plots=True):
+    def __init__(self, log, experiment_name=None, show_plots = True, save_plots=True, folder=None):
         self.log = log
         self.experiment_name = experiment_name
-        self.save_plots = True
+        if folder is not None:
+            self.experiment_name = os.path.join(folder, experiment_name)
+        self.save_plots = save_plots
+        self.show_plots = show_plots
 
     def plot_returns(self):
         num_agents = len([participant for participant in self.log])
@@ -27,7 +31,9 @@ class log_plotter():
         fig.tight_layout()
         if self.save_plots:
             plt.savefig(self.experiment_name + '_returns.png')
-        fig.show()
+        if self.show_plots:
+            fig.show()
+        plt.close()
         # calculattes and plots returns
         # optionally exports the plot as png for use externally
         return False
@@ -45,7 +51,9 @@ class log_plotter():
         fig.tight_layout()
         if self.save_plots:
             plt.savefig(self.experiment_name + '_quantities.png')
-        fig.show()
+        if self.show_plots:
+            fig.show()
+        plt.close()
         # calculattes and plots quantities
         # optionally exports the plot as png for use externally
         return False
@@ -68,5 +76,7 @@ class log_plotter():
         fig.tight_layout()
         if self.save_plots:
             plt.savefig(self.experiment_name + '_prices.png')
-        fig.show()
+        if self.show_plots:
+            fig.show()
+        plt.close()
         return False

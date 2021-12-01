@@ -138,7 +138,7 @@ if __name__ == '__main__':
     config_name = 'TB6C'
     solver = Solver(config_name)
     log, participants = solver.MA_MCTS(
-        max_it_per_gen=1000,
+        max_it_per_gen=3000,
         c_adjustment=1,
         learner_fraction_anneal=False,
         hard_reset_game_tree=True,)

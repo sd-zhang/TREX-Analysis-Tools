@@ -9,7 +9,9 @@ class log_plotter():
         self.log = log
         self.experiment_name = experiment_name
         if folder is not None:
-            self.experiment_name = os.path.join(folder, experiment_name)
+            self.plot_path = os.path.join(folder, experiment_name)
+        else:
+            self.plot_path = experiment_name
         self.save_plots = save_plots
         self.show_plots = show_plots
 
@@ -30,7 +32,7 @@ class log_plotter():
         fig.legend()
         fig.tight_layout()
         if self.save_plots:
-            plt.savefig(self.experiment_name + '_returns.png')
+            plt.savefig(self.plot_path + '_returns.png')
         if self.show_plots:
             fig.show()
         plt.close()
@@ -50,7 +52,7 @@ class log_plotter():
         fig.legend()
         fig.tight_layout()
         if self.save_plots:
-            plt.savefig(self.experiment_name + '_quantities.png')
+            plt.savefig(self.plot_path + '_quantities.png')
         if self.show_plots:
             fig.show()
         plt.close()
@@ -75,7 +77,7 @@ class log_plotter():
         fig.legend()
         fig.tight_layout()
         if self.save_plots:
-            plt.savefig(self.experiment_name + '_prices.png')
+            plt.savefig(self.plot_path + '_prices.png')
         if self.show_plots:
             fig.show()
         plt.close()

@@ -5,11 +5,12 @@ import seaborn as sns
 import pandas as pd
 
 # print(os.getcwd())
-def policy_plotter(study_name='study_name_pls'):
+def policy_plotter(study_name='study_name_pls', study_path=None, show_plots=False, save_plots=True, autoclose=True):
     #study_name = 'mcts-ute3b-2s-2d-verylong'
-    cwd = os.getcwd()
-    study_path = os.path.join(cwd, 'logs')
-    print(study_path)
+    if study_path is None:
+        cwd = os.getcwd()
+        study_path = os.path.join(cwd, 'logs')
+        print(study_path)
     log = utils.import_zp(study_path, study_name)
     study = log['config']['study']
     start_timestamp = utils.timestr_to_timestamp(study['start_datetime'], study['timezone'])
@@ -52,8 +53,16 @@ def policy_plotter(study_name='study_name_pls'):
     #     plt.show()
 
     category = 'price'
+    plt_number = 0
     for action_type in ('bids', 'asks'):
         policy_df = pd.DataFrame(policy[action_type])
         ax = sns.violinplot(x="participant", y=category, hue="timestep", data=policy_df)
         ax.set(title=(' '.join([study_name, action_type, category])))
-        plt.show()
+        if show_plots:
+            plt.show()
+        if save_plots:
+            plot_path = os.path.join(study_path, study_name + "_" + str(plt_number) + '.png' )
+            plt.savefig(plot_path)
+        if autoclose:
+            plt.close()
+        plt_number ++ 1

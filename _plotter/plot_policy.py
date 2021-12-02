@@ -65,4 +65,4 @@ def policy_plotter(study_name='study_name_pls', study_path=None, show_plots=Fals
             plt.savefig(plot_path)
         if autoclose:
             plt.close()
-        plt_number ++ 1
+        plt_number += 1

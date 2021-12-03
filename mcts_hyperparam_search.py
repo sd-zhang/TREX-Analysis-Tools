@@ -29,7 +29,7 @@ from mcts_nash_solver_3 import Solver
 # c_adjustmen: this will be radically different between BEES and non BEES cases, since BEES makes the tree very tricky
     # take c-adjustment from [1e-4 to 10]
     #
-iterations_per_gen = 10000 # we should set this to a reasonably small value, larger = better and we know it.
+iterations_per_gen = 1000 # we should set this to a reasonably small value, larger = better and we know it.
                             # too large and the hyperparameters wont have an effect
                             # at the same time if it is too small the search will favor broad searches too much!
 c_adjustments = [1e-6, 1e-5, 1e-4, 1e-3, 1e-3, 1e-2, 1e-1, 1, 10, 100, 1000]

@@ -70,7 +70,7 @@ class Market:
         return record
 
     def deliver(self, market_ledger, generation, consumption, battery=0, verbose=False):
-        # print(market_ledger)
+        # print(market_ledger, generation, consumption, battery)
         # sort asks from highest to lowest
         # sort bids from lowest to highest
         bids = sorted([sett for sett in market_ledger if sett[0] == 'bid'], key=lambda x: x[2], reverse=True)
@@ -201,7 +201,7 @@ class Market:
 
 
     # simulated market for participants, giving back learning agent's settlements, optionally for a specific timestamp
-    def simulate_transactions(self, participants: dict, learner_id:str, timestamp:int, learner_bias=0):
+    def simulate_transactions(self, participants: dict, learner_id:str, timestamp:int):
         # learning_agent = participants[learner_id]
         # # opponents = copy.deepcopy(participants)
         # # opponents.pop(learning_agent_id, None)
@@ -211,18 +211,9 @@ class Market:
         transactions_df = list()
         timestamps = [timestamp]
 
-        if learner_bias:
-            # randomize order of entry but prioritize learner
-            opponents = [participant for participant in list(participants.keys()) if participant != learner_id]
-            secure_random.shuffle(opponents)
-            if learner_bias > 0:
-                p_list = [learner_id] + opponents
-            elif learner_bias < 0:
-                p_list = opponents + [learner_id]
-        else:
-            # randomize order of entry
-            p_list = list(participants.keys())
-            secure_random.shuffle(p_list)
+        # randomize order of entry
+        p_list = list(participants.keys())
+        secure_random.shuffle(p_list)
 
         # print(participants.keys(), p_list)
         # get all actions taken by all agents for a time interval
@@ -233,7 +224,7 @@ class Market:
                 for action in ('bids', 'asks'):
                     if action in agent_actions:
                         for time_delivery in agent_actions[action]:
-                            # print(learner_id, participant_id, time_delivery, agent_actions[action])
+                            # print(learner_id, participant_id, timestamp, action, time_delivery, agent_actions[action])
                             if time_delivery not in open_t:
                                 open_t[time_delivery] = {}
                             if action not in open_t[time_delivery]:
@@ -247,11 +238,12 @@ class Market:
 
         for t_d in learning_agent_times_delivery:
             if 'bids' in open_t[t_d] and 'asks' in open_t[t_d]:
-                # print(t_d, open_t[t_d]['bids'])
+                # print(t_d, open_t[t_d]['asks'])
                 # random.shuffle((open_t[t_d]['bids']))
                 # random.shuffle((open_t[t_d]['asks']))
                 settled, unsettled = self.match(open_t[t_d]['bids'], open_t[t_d]['asks'], t_d)
                 transactions_df.extend(settled)
+        # print('tdf', transactions_df)
             # print(learner_id, t_d, open_t[t_d])
         # print(learner_id, pd.DataFrame(transactions_df))
         return pd.DataFrame(transactions_df)

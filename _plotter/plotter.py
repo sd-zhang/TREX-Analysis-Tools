@@ -20,7 +20,6 @@ class log_plotter():
         fig, ax = plt.subplots(num_agents, 1, sharex=True)
         ax[0].set_xlabel('Generations')
 
-
         plot_nbr = 0
         for participant in self.log:
             ax[plot_nbr].set_ylabel('Return')

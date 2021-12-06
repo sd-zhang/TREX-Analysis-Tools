@@ -77,7 +77,7 @@ class Solver:
                 market=self.market,
                 reward=self.reward,
                 time_start=self.simulation_env.configs['study']['start_timestamp'],
-                time_end=self.simulation_env.configs['study']['end_timestamp'] - 60,
+                time_end=self.simulation_env.configs['study']['end_timestamp'],
                 max_iterations=max_it_per_gen,
                 c_adjustment=c_adjustment
             )

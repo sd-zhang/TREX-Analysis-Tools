@@ -19,11 +19,11 @@ def policy_plotter(study_name='study_name_pls', study_path=None, show_plots=Fals
 
     step = 0
     step_size = 60
-    time_interval = (start_timestamp + step * step_size, start_timestamp + (step + 1) * step_size)
+    time_interval = (start_timestamp + (step - 1) * step_size, start_timestamp + step * step_size)
 
     policy = {}
     for step in range(steps):
-        time_interval = (start_timestamp + step * step_size, start_timestamp + (step + 1) * step_size)
+        time_interval = (start_timestamp + (step - 1) * step_size, start_timestamp + step * step_size)
         for participant_id in log['metrics']:
             # if participant_id not in policy:
             #     policy[participant_id] = {}
@@ -31,7 +31,7 @@ def policy_plotter(study_name='study_name_pls', study_path=None, show_plots=Fals
             for generation in history:
             # for idx in range(len(history)-500, len(history)):
             #     generation = history[idx]
-                actions = generation[time_interval[0]]
+                actions = generation[time_interval[1]]
                 for action_type in ('bids', 'asks'):
                     if action_type in actions:
                         if action_type not in policy:

@@ -57,14 +57,14 @@ class MCTS:
         # n: number of times this action was taken
 
         self.game_tree = dict()
-        s_0 = self.encode_states(time=time_start - 60)
+        s_0 = self.encode_states(time=time_start)
         self.game_tree[s_0] = {'N': 0}
         # return game_tree
 
     def encode_states(self, time):
-        # for now we only encode  time
+        # for now we only encode time
         if 'battery' in self.learner['trader']['actions']:
-            if time + 60 <= self.time_start:
+            if time <= self.time_start:
                 state_of_charge = 0
             else:
                 state_of_charge = self.learner['metrics'][time]['battery']['battery_SoC']
@@ -91,7 +91,7 @@ class MCTS:
         for action_type in action_types:
             if action_type in {'bids', 'asks'} and actions['quantity'][a[1]]:
                 actions_dict[action_types[0]] = {
-                    str((timestamp, timestamp+60)): {
+                    str((timestamp-60, timestamp)): {
                         'quantity': actions['quantity'][a[1]],
                         'price': actions['price'][a[0]],
                         'source': 'solar',
@@ -154,7 +154,6 @@ class MCTS:
             s_next = None
             a = None
             return s_next, a, finished
-
         # its no leaf node, so we expand using ucb policy
         # determining ucb next action
         a = self.ucb(s_now=s_now)
@@ -184,7 +183,7 @@ class MCTS:
         return s_next, a, finished
 
     # one MCTS rollout
-    def one_rollout_and_backup(self,  s_now):
+    def one_rollout_and_backup(self, s_now):
         action = None
         trajectory = []
         finished = False
@@ -266,21 +265,25 @@ class MCTS:
             entry = self.market.simulated_transactions_to_ledger(settlement, self.learner_id)
             if entry is not None:
                 market_ledger.append(entry)
+
         # if market_ledger:
-        #     print(market_ledger)
+        #     print(simulated_transactions)
 
         # if quantity:
         #     print(quantity)
         # ToDO: test if market is actually doing the right thing
 
         # we need access to start_energy [0 ... max_energy] and a target_action [-max_energy, max_energy]
+        real_flux = 0
         if 'battery' in self.learner['metrics'][timestamp]:
+            # print(self.learner_id, self.learner['metrics'][timestamp])
             # FixMe: Apparently Daniel fucked up time here somehow, the very first row of Metrics never gets updated to a real So
-            if timestamp == self.time_start:
+            if timestamp-60 <= self.time_start:
                 soc_start = 0
             else:
                 if timestamp-60 not in self.learner['metrics']: # FixMe: catch for general shit
                     print('missing ts!!')
+                    print(timestamp)
                 soc_start = self.learner['metrics'][timestamp-60]['battery']['battery_SoC']
             target_flux = self.learner['metrics'][timestamp]['battery']['target_flux']
 
@@ -293,18 +296,20 @@ class MCTS:
 
             real_flux, soc_end = self.learner['storage'].simulate_activity(start_energy=soc_start, target_energy=target_flux)
             self.learner['metrics'][timestamp]['battery']['battery_SoC'] = soc_end
-        else:
-            real_flux = 0
+            # print(soc_start, target_flux, real_flux, soc_end)
+
+            # if self.learner_id == "R1" and timestamp-60 == self.time_start:
+            #     print(timestamp, soc_start, target_flux, real_flux)
+
 
         # calculate the resulting grid transactions
         generation = self.learner['metrics'][timestamp]['gen']
         consumption = self.learner['metrics'][timestamp]['load']
 
-        # if self.learner_id == "R1":
+        # if self.learner_id == "R2":
         #     print(self.learner_id, timestamp, generation, consumption, soc_start, target_flux, real_flux)
-        #     print(self.learner['metrics'][timestamp - 60]['battery'])
+        #     print(self.learner['metrics'][timestamp])
         #     print(self.learner['metrics'][timestamp - 60])
-
 
         bids, asks, grid_transactions, financial_transactions = \
             self.market.deliver(market_ledger=market_ledger,
@@ -312,18 +317,54 @@ class MCTS:
                                 consumption=consumption,
                                 battery=real_flux)
 
+        # if self.learner_id == 'R2':
+        #     print(market_ledger, generation, consumption, real_flux)
+        # print(bids, asks, grid_transactions, financial_transactions)
+
         # if self.learner_id == "R1":
         #     print(self.learner_id, timestamp, generation, consumption)
         #     print(soc_start, target_flux, real_flux)
         #     print(bids, asks, grid_transactions, financial_transactions)
         #     print(self.learner['metrics'][timestamp - 60]['battery'])
+        #     print(timestamp)
+            # print(generation, consumption)
+            # print(self.learner['metrics'][timestamp - 60]['asks'][str((timestamp-60, timestamp))]['quantity'])
+
+        # if self.learner_id == "R3":
+            # print(generation, consumption)
+        # #     print(self.learner_id, timestamp, generation, consumption)
+        # #     print(soc_start, target_flux, real_flux)
+        # #     print(bids, asks, grid_transactions, financial_transactions)
         #     print(self.learner['metrics'][timestamp - 60])
+        #     print(timestamp)
+        # access_fee = 0 # temporary hack to discourage market use when not necessary
+        # bid_action_qty = 0
+        # ask_action_qty = 0
+        # if 'bids' in self.learner['metrics'][timestamp]:
+        #     bid_action_qty = self.learner['metrics'][timestamp]['bids'][str((timestamp-60, timestamp))]['quantity']
+        #     if consumption <= 0 and bid_action_qty >= 0:
+        #         access_fee -= 10
+        #
+        # if 'asks' in self.learner['metrics'][timestamp]:
+        #     ask_action_qty = self.learner['metrics'][timestamp]['asks'][str((timestamp-60, timestamp))]['quantity']
+        #     if generation <= 0 and (ask_action_qty - real_flux) >= 0:
+        #         access_fee -= 10
+
+        # if self.learner_id == "R1":
+        #     print(timestamp, generation, consumption, bid_action_qty, ask_action_qty, real_flux, access_fee)
+            # print(timestamp, generation, consumption)
+            # print(self.learner['metrics'][timestamp])
+
+            # if self.learner_id == "R1":
+            #     print(generation, consumption, ask_action_qty, access_fee)
 
         # then calculate the reward function
         rewards, metrics = self.reward.calculate(bids=bids,
                                                  asks=asks,
                                                  grid_transactions=grid_transactions,
                                                  financial_transactions=financial_transactions)
+
+        # print(self.learner['metrics'][timestamp - 60]
         # print('r: ', rewards)
         # if do_print:
         # print('market', market_ledger)
@@ -334,6 +375,7 @@ class MCTS:
         asks_qty = metrics.pop('asks_quantity', 0)
         quantity = bids_qty + asks_qty
 
+        # rewards += access_fee
         # grid_transactions = (grid_buy, self.grid_buy_price, grid_sell, self.grid_sell_price)
         # return rewards, quantity, metrics
         return rewards, metrics, bids_qty, asks_qty, grid_transactions[0], grid_transactions[2]
@@ -354,7 +396,7 @@ class MCTS:
         else:
             print('reset visits for the game tree')
             self.reset_visits()
-        s_0 = self.encode_states(time=self.time_start - 60)
+        s_0 = self.encode_states(time=self.time_start)
         for iteration in range(self.max_iterations):
             self.one_rollout_and_backup(s_0)
 
@@ -461,11 +503,12 @@ class MCTS:
                 'grid_buy': grid_buy_qty,
                 'grid_sell': grid_sell_qty
             }
+            # print(metric_ts)
             # print(timestamp, metric_ts)
             # metric_ts = ''
 
             # metric_ts = self.learner['metrics'][timestamp]
-            time_interval = str((timestamp, timestamp + 60))
+            time_interval = str((timestamp-60, timestamp))
             bid_actions = metric_ts['bids'][time_interval]['quantity'] if 'bids' in metric_ts else 0
             ask_actions = metric_ts['asks'][time_interval]['quantity'] if 'asks' in metric_ts else 0
             cumulative_bids_qty[0] += bid_actions

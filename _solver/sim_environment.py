@@ -38,6 +38,7 @@ class SimulationEnvironment:
         trader = self.participants[participant]['trader']
         table_name = trader['use_synthetic_profile'] if 'use_synthetic_profile' in trader else participant
         table = db[table_name]
+        # profile timestamp is the end of the measurement interval
         p = table.find(table.table.columns.tstamp.between(study['start_timestamp'], study['end_timestamp']))
         self.participants[participant]['profile'] = list(p)
         # print(self.participants[participant]['profile'][0])
@@ -130,23 +131,32 @@ class SimulationEnvironment:
             t_end = row['tstamp']
 
             # print(participant, t_end, generation, consumption)
+            if t_end not in metrics:
+                metrics[t_end] = dict()
 
-            if net_load > 0:
+            # target_flux = 0
+            # if 'storage' in self.participants[participant]:
+            #     target_flux = secure_random.choice(actions['battery'])
+            #     net_load += target_flux
+
+            if net_load >= 0:
                 action_type = 'bids'
             else:
                 action_type = 'asks'
+            # print(participant, t_start, generation, consumption, net_load, action_type)
+            metrics[t_end][action_type] = {str((t_start, t_end)):
+                                               {'quantity': secure_random.choice(actions['quantity']),
+                                                'price': secure_random.choice(actions['price']),
+                                                'source': 'solar',
+                                                'participant_id': participant,
+                                                }
+                                           }
 
-            metrics[t_start] = {action_type:
-                                    {str((t_start, t_end)):
-                                         {'quantity': secure_random.choice(actions['quantity']),
-                                         'price': secure_random.choice(actions['price']),
-                                         'source': 'solar',
-                                         'participant_id': participant,
-                                         },
-                                     }
-                                }
             if 'storage' in self.participants[participant]:
-                metrics[t_start]['battery'] = {'battery_SoC': None, 'target_flux': None}
+                metrics[t_end]['battery'] = {'battery_SoC': None,
+                                             'target_flux': None}
 
-            metrics[t_start]['gen'] = generation
-            metrics[t_start]['load'] = consumption
+            # print(participant, t_end, metrics)
+
+            metrics[t_end]['gen'] = generation
+            metrics[t_end]['load'] = consumption

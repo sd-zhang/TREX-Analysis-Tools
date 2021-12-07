@@ -69,6 +69,7 @@ class Solver:
             self.metrics[participant] = {'G': list(),
                                          'quantity': list()}
 
+        game_trees = dict()
         learning_mcts = dict()
         for participant_id in learning_participants:
             learning_mcts[participant_id] = mcts.MCTS(
@@ -131,22 +132,23 @@ class Solver:
                 self.update_metrics(participant_id, G, cumulative_quantity, avg_prices, learning_mcts[participant_id].learner['metrics'])
                 self.simulation_env.participants[participant_id]['metrics'].update(
                     learning_mcts[participant_id].learner['metrics'])
-
-        return self.metrics, self.simulation_env.participants
+                game_trees[participant_id] = learning_mcts[participant_id].game_tree
+        return self.metrics, self.simulation_env.participants, game_trees
 
 if __name__ == '__main__':
     config_name = 'TB6C'
     solver = Solver(config_name)
-    log, participants = solver.MA_MCTS(
-        max_it_per_gen=3000,
+    log, participants, game_trees = solver.MA_MCTS(
+        max_it_per_gen=1000,
         c_adjustment=1,
         learner_fraction_anneal=False,
-        hard_reset_game_tree=True,)
+        hard_reset_game_tree=True)
     print(solver.study_name)
     output = {
         'config': utils.load_config(config_name),
         'metrics': log,
-        'participants': participants
+        'participants': participants,
+        'game_trees': game_trees
     }
 
     utils.dump_zp('logs', solver.study_name, output)

@@ -13,7 +13,7 @@ class SimulationEnvironment:
         study['start_timestamp'] = utils.timestr_to_timestamp(study['start_datetime'], study['timezone'])
         study['end_timestamp'] = study['start_timestamp'] + int(study['days'] * 1440) * 60
 
-        print(study['name'])
+        print(study['name'], study['start_timestamp'], study['end_timestamp'])
         print((study['end_timestamp'] - study['start_timestamp']) / 60, 'steps')
 
         self.participants = self.configs['participants']
@@ -40,7 +40,7 @@ class SimulationEnvironment:
         table = db[table_name]
         # profile timestamp is the end of the measurement interval
         p = table.find(table.table.columns.tstamp.between(study['start_timestamp'], study['end_timestamp']))
-        self.participants[participant]['profile'] = list(p)
+        self.participants[participant]['profile'] = list(p)[:-1]
         # print(self.participants[participant]['profile'][0])
 
     def __setup_actions(self, participant):
@@ -68,10 +68,11 @@ class SimulationEnvironment:
             # limit prices to be between grid
             grid_price_sell = self.configs['market']['grid']['price']
             grid_price_buy = grid_price_sell * (1 + self.configs['market']['grid']['fee_ratio'])
-            actions['price'] = list(np.round(np.linspace(grid_price_sell, grid_price_buy, 9), 5))
+            actions['price'] = sorted(list(np.round(np.linspace(grid_price_sell, grid_price_buy, 9), 5)))
 
         if 'quantity' not in actions or not actions['quantity']:
             actions['quantity'] = list(range(0, max_qty+1, 1))
+            # actions['quantity'] = list(range(0, max_qty, 3)) + [max_qty]
 
         # actions['price'] = tuple(np.linspace(trader['bid_price'], trader['ask_price']imp, 3))
         # actions['price'] = tuple(np.array([0.1]))
@@ -82,8 +83,8 @@ class SimulationEnvironment:
         if 'storage' in self.participants[participant]:
             if 'battery' not in actions or not actions['battery']:
                 # actions['battery'] = tuple(range(-20, 20, 1))
-                actions['battery'] = list(range(-max_qty, max_qty+1, 1))
-
+                # actions['battery'] = list(range(-max_qty, max_qty+1, 3))
+                actions['battery'] = list(set(list(-np.array(actions['quantity'])) + actions['quantity']))
                 # temporarily disable price and quantity to speed up self consumption sim
                 # actions['price'] = [0]
                 # actions['quantity'] = [0]
@@ -134,27 +135,35 @@ class SimulationEnvironment:
             if t_end not in metrics:
                 metrics[t_end] = dict()
 
-            # target_flux = 0
-            # if 'storage' in self.participants[participant]:
-            #     target_flux = secure_random.choice(actions['battery'])
-            #     net_load += target_flux
+            target_flux = 0
+            if 'storage' in self.participants[participant]:
+                target_flux = secure_random.choice(actions['battery'])
+                net_load += target_flux
 
             if net_load >= 0:
                 action_type = 'bids'
+                # print(participant, t_start, generation, consumption, net_load, action_type)
+                metrics[t_end][action_type] = {str((t_start, t_end)):
+                                                   {'quantity': secure_random.choice(actions['quantity']),
+                                                    'price': secure_random.choice(actions['price'][len(actions['price'])//2:]),
+                                                    'participant_id': participant,
+                                                    }
+                                               }
             else:
                 action_type = 'asks'
-            # print(participant, t_start, generation, consumption, net_load, action_type)
-            metrics[t_end][action_type] = {str((t_start, t_end)):
-                                               {'quantity': secure_random.choice(actions['quantity']),
-                                                'price': secure_random.choice(actions['price']),
-                                                'source': 'solar',
-                                                'participant_id': participant,
-                                                }
-                                           }
+                metrics[t_end][action_type] = {str((t_start, t_end)):
+                                                   {'quantity': secure_random.choice(actions['quantity']),
+                                                    'price': secure_random.choice(actions['price'][:len(actions['price'])//2]),
+                                                    'source': 'solar',
+                                                    'participant_id': participant,
+                                                    }
+                                               }
 
             if 'storage' in self.participants[participant]:
                 metrics[t_end]['battery'] = {'battery_SoC': None,
-                                             'target_flux': None}
+                                             'target_flux': target_flux}
+                                             # 'target_flux': secure_random.choice(actions['battery'])}
+                                             # 'target_flux': None}
 
             # print(participant, t_end, metrics)
 

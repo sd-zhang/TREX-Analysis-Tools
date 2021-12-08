@@ -24,7 +24,7 @@ class MCTS:
         self.max_iterations = max_iterations
         self.c_adjustment = c_adjustment
         self.game_tree = dict()
-        self.current_timestamp = self.time_start - 60
+        self.current_timestamp = self.time_start
 
         self.update_participants(participants)
 
@@ -68,20 +68,22 @@ class MCTS:
             n_next = self.game_tree['current_node'].preferred_child_ucb(self.c_adjustment, final_layer)
             # n_next = self.game_tree['current_node'].preferred_child_greedy(final_layer)
 
-
-
-        self.current_timestamp += 60
-        r = self.evaluate_transition(self.current_timestamp, n_next.action)
+        # self.current_timestamp += 60
+        # print(self.current_timestamp, final_layer)
+        r = self.evaluate_transition(self.current_timestamp, n_next.action) if not final_layer else 0
         self.game_tree['current_node'] = n_next
         # self.game_tree['current_node'].backup_update_jinjerry(r)
         self.game_tree['current_node'].backup_update(r)
 
     def one_rollout_and_backup(self):
         self.game_tree['current_node'] = self.game_tree['root_node']
-        self.current_timestamp = self.time_start - 60
+        # make sure the root node is created 1 step before the simulation
+        # so that the first leaf layer corresponds to first time step
+        self.current_timestamp = self.time_start
         while self.current_timestamp < self.time_end:
             final_layer = self.current_timestamp >= self.time_end
             self.step(final_layer)
+            self.current_timestamp += 60
 
     def evaluate_transition(self, timestamp, a):
         actions = self.decode_actions(a=a, timestamp=timestamp)
@@ -256,7 +258,7 @@ class MCTS:
         avg_prices = {}
         profile = self.learner['profile']
         # for timestamp in timestamps:
-        for step in profile[:-1]:
+        for step in profile:
             timestamp = step['tstamp']
             # return rewards, quantity, metrics
             # r, quantity, avg_price_row = self.get_reward_for_transactions(timestamp)
@@ -368,12 +370,12 @@ class MCTS:
     def update_policy_from_tree(self):
         self.game_tree['current_node'] = self.game_tree['root_node']
         # print(self.game_tree['current_node'].children)
-        timestamp = self.time_start - 60
+        timestamp = self.time_start
         while timestamp < self.time_end:
             # n_next = self.game_tree['current_node'].preferred_child_ucb(self.c_adjustment, timestamp >= self.time_end)
             n_next = self.game_tree['current_node'].preferred_child_greedy(timestamp >= self.time_end)
-            timestamp += 60
             # print(timestamp)
             actions = self.decode_actions(a=n_next.action, timestamp=timestamp)
             self.learner['metrics'][timestamp].update(actions)
             self.game_tree['current_node'] = n_next
+            timestamp += 60

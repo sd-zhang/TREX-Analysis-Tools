@@ -475,6 +475,9 @@ class MCTS:
         cumulative_financial_buy_qty = 0
         cumulative_financial_sell_qty = 0
 
+        cumulative_bids_price = 0
+        cumulative_asks_price = 0
+
         # cumulative_quantity = 0
         avg_prices = {}
         profile = self.learner['profile']
@@ -515,10 +518,15 @@ class MCTS:
 
             # metric_ts = self.learner['metrics'][timestamp]
             time_interval = str((timestamp-60, timestamp))
-            bid_actions = metric_ts['bids'][time_interval]['quantity'] if 'bids' in metric_ts else 0
-            ask_actions = metric_ts['asks'][time_interval]['quantity'] if 'asks' in metric_ts else 0
-            cumulative_bids_qty[0] += bid_actions
-            cumulative_asks_qty[0] += ask_actions
+            bid_actions_q = metric_ts['bids'][time_interval]['quantity'] if 'bids' in metric_ts else 0
+            ask_actions_q = metric_ts['asks'][time_interval]['quantity'] if 'asks' in metric_ts else 0
+            cumulative_bids_qty[0] += bid_actions_q
+            cumulative_asks_qty[0] += ask_actions_q
+
+            bid_actions_p = metric_ts['bids'][time_interval]['price'] if 'bids' in metric_ts else 0
+            ask_actions_p = metric_ts['asks'][time_interval]['price'] if 'asks' in metric_ts else 0
+            cumulative_bids_price += bid_actions_p * bid_actions_q
+            cumulative_asks_price += ask_actions_p * ask_actions_q
             # print(bid_actions)
 
         for category in avg_prices:
@@ -543,6 +551,12 @@ class MCTS:
                 ]
 
             print(*stats)
-            print('avg prices: ', avg_prices)
+            print('avg action prices: ',
+                  'bids:', round(cumulative_bids_price/cumulative_bids_qty[0], 4) if cumulative_bids_qty[0] > 0 else np.nan,
+                  'asks:', round(cumulative_asks_price/cumulative_asks_qty[0], 4) if cumulative_asks_qty[0] > 0 else np.nan
+                  )
+            print('avg settle prices: ',
+                  'bids:', round(avg_prices['avg_bid_price'], 4),
+                  'asks:', round(avg_prices['avg_ask_price'], 4))
             print('.........................................')
         return G, cumulative_bids_qty[1] + cumulative_asks_qty[1], avg_prices

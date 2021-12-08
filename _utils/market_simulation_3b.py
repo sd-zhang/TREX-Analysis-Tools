@@ -176,8 +176,6 @@ class Market:
                 grid_buy -= min(total_bids, bid_deficit)
                 grid_buy += battery
 
-
-
         # print(grid_buy, self.grid_buy_price, grid_sell, self.grid_sell_price)
         elif total_bids < consumption:
             # print('tb < c')

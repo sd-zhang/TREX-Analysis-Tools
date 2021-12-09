@@ -49,8 +49,12 @@ class MCTS:
         self.learner.update(self.participants[self.learner_id])
 
     def init_game_tree(self):
-        self.game_tree['root_node'] = node.Node()
-        self.game_tree['current_node'] = self.game_tree['root_node']
+        if 'root_node' not in self.game_tree:
+            self.game_tree['root_node'] = node.Node()
+            self.game_tree['current_node'] = self.game_tree['root_node']
+        else:
+            self.game_tree['current_node'] = self.game_tree['root_node']
+            self.game_tree['root_node'].reset()
 
     # a single step of MCTS, one node evaluation
     def step(self, final_layer):
@@ -225,8 +229,9 @@ class MCTS:
         # if not self.game_tree:
         # print(reset_tree)
         if reset_tree:
-            print('completely reset game tree')
+            print('reset game tree')
             self.init_game_tree()
+        print('starting...')
         # else:
         #     print('reset visits for the game tree')
         #     self.reset_visits()

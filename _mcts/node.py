@@ -43,6 +43,11 @@ class Node:
         for action in actions:
             self.add_child(action)
 
+    def prune(self, child_to_keep):
+        for child in self.children:
+            if child is not child_to_keep:
+                self.children[child] = None
+
     def random_child(self):
         child_key = secure_random.choice(list(self.children.keys()))
         self.add_child(child_key)
@@ -88,6 +93,11 @@ class Node:
         self.N += 1
         if self.parent:
             self.parent.backup_update(self.V)
+
+    def reset(self):
+        self.N = 0
+        self.V = 0
+        self.children = dict()
 
     #
     # def add_child(self, child):

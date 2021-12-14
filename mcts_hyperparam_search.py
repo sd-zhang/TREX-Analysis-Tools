@@ -32,7 +32,7 @@ from mcts_nash_solver_3 import Solver
 iterations_per_gen = 1000 # we should set this to a reasonably small value, larger = better and we know it.
                             # too large and the hyperparameters wont have an effect
                             # at the same time if it is too small the search will favor broad searches too much!
-c_adjustments = [1e-6, 1e-5, 1e-4, 1e-3, 1e-3, 1e-2, 1e-1, 1, 10, 100, 1000]
+c_adjustments = [100, 10, 1]
 if __name__ == '__main__':
 
     config_name = 'TB3C'
@@ -41,11 +41,10 @@ if __name__ == '__main__':
         hyperparams_search_iterations = []
         for iteration in range(5):
             solver = Solver(config_name)
-            log, participants = solver.MA_MCTS(
+            log, participants, game_trees = solver.MA_MCTS(
                 max_it_per_gen=iterations_per_gen,
                 c_adjustment=c_adjustment,
-                learner_fraction_anneal=False,
-                hard_reset_game_tree=True,)
+                hard_reset_game_tree=False)
 
             print(solver.study_name)
             # lets extract the important info out here:
@@ -72,11 +71,13 @@ if __name__ == '__main__':
             output = {
                 'config': utils.load_config(config_name),
                 'metrics': log,
-                'participants': participants
+                'participants': participants,
+                'game_trees': game_trees
             }
             utils.dump_zp(sub_folder_path, study, output)
 
             # lets generate some plots and save them
+            # try:
             policy_plotter(study_name=study, study_path=sub_folder_path, show_plots=False)
             plotter = log_plotter(output['metrics'],
                                   experiment_name=study,

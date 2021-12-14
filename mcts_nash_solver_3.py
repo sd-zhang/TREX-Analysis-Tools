@@ -10,7 +10,8 @@ import _utils.market_simulation_3b as market
 from _utils.rewards_proxy import NetProfit_Reward as Reward
 from _utils import utils
 from _utils.utils import secure_random
-import mcts
+# import mcts
+import mcts_ol as mcts
 from joblib import Parallel, delayed
 from _plotter.plotter import log_plotter
 from _plotter.plot_policy import policy_plotter
@@ -56,8 +57,7 @@ class Solver:
     def MA_MCTS(self,
                 max_it_per_gen,
                 c_adjustment,
-                learner_fraction_anneal=False, #Experimental feature that might help calm violence of conversion
-                hard_reset_game_tree=False
+                hard_reset_game_tree=False,
                 ):
         generations = self.simulation_env.configs['study']['generations']
         learning_participants = [participant for participant in self.simulation_env.participants if
@@ -84,22 +84,6 @@ class Solver:
             )
 
         for gen in range(generations):
-            if learner_fraction_anneal:
-                fraction_to_optimize = (generations - gen)/generations
-                fraction_to_optimize = len(learning_participants) * fraction_to_optimize
-                fraction_to_optimize = int(np.ceil(fraction_to_optimize))
-
-                if fraction_to_optimize > 1:
-                    active_learning_participants = secure_random.sample(learning_participants, fraction_to_optimize)
-                else:
-                    learning_participants = list(np.roll(learning_participants, 1))
-                    active_learning_participants = [learning_participants[0]]
-
-                print(active_learning_participants)
-                print('selecting ', fraction_to_optimize/len(learning_participants)*100, 'percent of available participants to learn')
-            else:
-                active_learning_participants = learning_participants
-
             for participant_id in learning_participants:
                 learning_mcts[participant_id].update_participants(self.simulation_env.participants)
 
@@ -112,36 +96,47 @@ class Solver:
             # parallel execution code
             #ToDo: follow this a little bit to see how this works now
             print('MCTS gen', gen)
-            reset_tree = hard_reset_game_tree
-            if gen == 0: #might wanna comment this out
+            reset_tree = False
+            prune = False
+            if gen <= 0 or hard_reset_game_tree: #might wanna comment this out
                 reset_tree = True
 
-            with Parallel(n_jobs=len(active_learning_participants)) as parallel:
+            # if not reset_tree and gen > int(generations//5):
+            # if not reset_tree and gen:
+            #     prune = True
+
+            with Parallel(n_jobs=len(learning_participants)) as parallel:
                 results = parallel(delayed(learning_mcts[participant_id].run)(reset_tree) for
-                                   participant_id in active_learning_participants)
+                                   participant_id in learning_participants)
 
             for result in results:
                 for participant_id in result:
                     # copy tree and metrics back into MCTS instances to deal with parallel processing oddity
                     learning_mcts[participant_id].game_tree.update(result[participant_id]['game_tree'])
                     learning_mcts[participant_id].learner['metrics'].update(result[participant_id]['metrics'])
-                    learning_mcts[participant_id].update_policy_from_tree(result[participant_id]['s_0'])
+                    # learning_mcts[participant_id].update_policy_from_tree()
 
-            for participant_id in learning_participants:
-                G, cumulative_quantity, avg_prices = learning_mcts[participant_id].evaluate_policy()
-                self.update_metrics(participant_id, G, cumulative_quantity, avg_prices, learning_mcts[participant_id].learner['metrics'])
-                self.simulation_env.participants[participant_id]['metrics'].update(
-                    learning_mcts[participant_id].learner['metrics'])
-                game_trees[participant_id] = learning_mcts[participant_id].game_tree
+                    G, cumulative_quantity, avg_prices = learning_mcts[participant_id].evaluate_policy()
+                    self.update_metrics(participant_id, G, cumulative_quantity, avg_prices,
+                                        learning_mcts[participant_id].learner['metrics'])
+                    self.simulation_env.participants[participant_id]['metrics'].update(
+                        learning_mcts[participant_id].learner['metrics'])
+                    game_trees[participant_id] = learning_mcts[participant_id].game_tree
+
+            # for participant_id in learning_participants:
+            #     G, cumulative_quantity, avg_prices = learning_mcts[participant_id].evaluate_policy()
+            #     self.update_metrics(participant_id, G, cumulative_quantity, avg_prices, learning_mcts[participant_id].learner['metrics'])
+            #     self.simulation_env.participants[participant_id]['metrics'].update(
+            #         learning_mcts[participant_id].learner['metrics'])
+            #     game_trees[participant_id] = learning_mcts[participant_id].game_tree
         return self.metrics, self.simulation_env.participants, game_trees
 
 if __name__ == '__main__':
-    config_name = 'TB6C'
+    config_name = 'TB3C'
     solver = Solver(config_name)
     log, participants, game_trees = solver.MA_MCTS(
-        max_it_per_gen=1000,
+        max_it_per_gen=2,
         c_adjustment=1,
-        learner_fraction_anneal=False,
         hard_reset_game_tree=True)
     print(solver.study_name)
     output = {
@@ -152,12 +147,15 @@ if __name__ == '__main__':
     }
 
     utils.dump_zp('logs', solver.study_name, output)
-    policy_plotter(study_name=solver.study_name)
-
-    plotter = log_plotter(output['metrics'], experiment_name='Hard Tree Resets 1000Its 100Gens TB6C')
-    plotter.plot_prices()
-    plotter.plot_quantities()
+    # policy_plotter(study_name=solver.study_name)
+    #
+    # plotter = log_plotter(output['metrics'], experiment_name='Hard Tree Resets 1000Its 1000Gens TB6')
+    # plotter.plot_prices()
+    # plotter.plot_quantities()
     # plotter.plot_returns()
-    log_plotter(log)
+    # log_plotter(log)
     print('fin')
 
+from _utils import utils
+# log = utils.import_zp("D:/TREX/TREX-Analysis-Tools/mcts-ute3b-bess-2s/0.1/", "C0.1_iteration0")
+log = utils.import_zp("logs/", "mcts-ute3b-bess-1s-1d-soft-reset-random")

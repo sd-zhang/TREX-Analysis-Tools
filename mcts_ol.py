@@ -1,5 +1,7 @@
 import numpy as np
 import copy
+
+import _utils.utils
 from _mcts import node
 from _utils.utils import secure_random
 
@@ -58,26 +60,27 @@ class MCTS:
 
     # a single step of MCTS, one node evaluation
     def step(self, final_layer):
-
-        # if not self.game_tree['current_node'].children or secure_random.random() <= 0.1:
-        #     new_action = secure_random.choice(self.linear_action_space)
-        #     if new_action not in self.game_tree['current_node'].children_actions:
-        #         self.game_tree['current_node'].add_child(secure_random.choice(self.linear_action_space))
-        #         n_next = self.game_tree['current_node'].random_child()
-
-        if not self.game_tree['current_node'].children:
-            self.game_tree['current_node'].initialize_children(self.linear_action_space)
-            n_next = self.game_tree['current_node'].random_child()
+        new_children = self.game_tree['current_node'].initialize_children(self.linear_action_space)
+        if new_children:
+            # n_next = self.game_tree['current_node'].random_child()
+            n_next = self.game_tree['current_node'].preferred_child_greedy(final_layer, prefer='value')
         else:
-            n_next = self.game_tree['current_node'].preferred_child_ucb(self.c_adjustment, final_layer)
             # n_next = self.game_tree['current_node'].preferred_child_greedy(final_layer)
+            n_next = self.game_tree['current_node'].preferred_child_ucb(self.c_adjustment, final_layer)
+            # n_next = self.game_tree['current_node'].random_child()
+
+            # if secure_random.random() <= 0.5:
+            #     n_next = self.game_tree['current_node'].random_child()
+            # else:
+            #     n_next = self.game_tree['current_node'].preferred_child_greedy(final_layer)
+
 
         # self.current_timestamp += 60
         # print(self.current_timestamp, final_layer)
         r = self.evaluate_transition(self.current_timestamp, n_next.action) if not final_layer else 0
         self.game_tree['current_node'] = n_next
-        # self.game_tree['current_node'].backup_update_jinjerry(r)
         self.game_tree['current_node'].backup_update(r)
+        # self.game_tree['current_node'].backup_update_jinjerry(r)
 
     def one_rollout_and_backup(self):
         self.game_tree['current_node'] = self.game_tree['root_node']
@@ -90,8 +93,17 @@ class MCTS:
             self.current_timestamp += 60
 
     def evaluate_transition(self, timestamp, a):
+        # print(self.learner_id, a)
         actions = self.decode_actions(a=a, timestamp=timestamp)
+        # print(self.learner_id, self.learner['metrics'][timestamp])
+
+        #TODO: update this to be more efficient
+        self.learner['metrics'][timestamp].pop('bids', None)
+        self.learner['metrics'][timestamp].pop('asks', None)
+        self.learner['metrics'][timestamp].pop('battery', None)
         self.learner['metrics'][timestamp].update(actions)
+        # self.learner['metrics'] =
+
         r, _, _, _, _, _, _, _ = self.get_reward_for_transactions(timestamp=timestamp)
         return r
 
@@ -101,8 +113,10 @@ class MCTS:
         simulated_transactions = self.market.simulate_transactions(participants=self.participants,
                                                                    learner_id=self.learner_id,
                                                                    timestamp=timestamp)
+
         market_ledger = list()
         # quantity = 0
+        # print(self.learner_id, self.learner['metrics'][timestamp])
 
         for index in range(simulated_transactions.shape[0]):
             settlement = simulated_transactions.iloc[index]
@@ -110,6 +124,8 @@ class MCTS:
             if entry is not None:
                 market_ledger.append(entry)
 
+        # print(simulated_transactions)
+        # print(market_ledger)
         # if market_ledger:
         #     print(simulated_transactions)
 
@@ -150,59 +166,21 @@ class MCTS:
         generation = self.learner['metrics'][timestamp]['gen']
         consumption = self.learner['metrics'][timestamp]['load']
 
-        # if self.learner_id == "R2":
-        #     print(self.learner_id, timestamp, generation, consumption, soc_start, target_flux, real_flux)
-        #     print(self.learner['metrics'][timestamp])
-        #     print(self.learner['metrics'][timestamp - 60])
-
+        # print(self.learner_id, market_ledger)
         bids, asks, grid_transactions, financial_transactions = \
             self.market.deliver(market_ledger=market_ledger,
                                 generation=generation,
                                 consumption=consumption,
                                 battery=real_flux)
 
-        # if self.learner_id == 'R2':
-        #     print(market_ledger, generation, consumption, real_flux)
-        # print(bids, asks, grid_transactions, financial_transactions)
-
-        # if self.learner_id == "R1":
-        #     print(self.learner_id, timestamp, generation, consumption)
-        #     print(soc_start, target_flux, real_flux)
-        #     print(bids, asks, grid_transactions, financial_transactions)
-        #     print(self.learner['metrics'][timestamp - 60]['battery'])
-        #     print(timestamp)
-            # print(generation, consumption)
-            # print(self.learner['metrics'][timestamp - 60]['asks'][str((timestamp-60, timestamp))]['quantity'])
-
-        # if self.learner_id == "R3":
-            # print(generation, consumption)
-        # #     print(self.learner_id, timestamp, generation, consumption)
-        # #     print(soc_start, target_flux, real_flux)
-        # #     print(bids, asks, grid_transactions, financial_transactions)
-        #     print(self.learner['metrics'][timestamp - 60])
-        #     print(timestamp)
-        # access_fee = 0 # temporary hack to discourage market use when not necessary
-        # bid_action_qty = 0
-        # ask_action_qty = 0
-        # if 'bids' in self.learner['metrics'][timestamp]:
-        #     bid_action_qty = self.learner['metrics'][timestamp]['bids'][str((timestamp-60, timestamp))]['quantity']
-        #     if consumption <= 0 and bid_action_qty >= 0:
-        #         access_fee -= 10
-        #
-        # if 'asks' in self.learner['metrics'][timestamp]:
-        #     ask_action_qty = self.learner['metrics'][timestamp]['asks'][str((timestamp-60, timestamp))]['quantity']
-        #     if generation <= 0 and (ask_action_qty - real_flux) >= 0:
-        #         access_fee -= 10
-
-        # if self.learner_id == "R1":
-        #     print(timestamp, generation, consumption, bid_action_qty, ask_action_qty, real_flux, access_fee)
-            # print(timestamp, generation, consumption)
-            # print(self.learner['metrics'][timestamp])
-
-            # if self.learner_id == "R1":
-            #     print(generation, consumption, ask_action_qty, access_fee)
 
         # then calculate the reward function
+        # print(self.learner_id, bids, asks, grid_transactions, financial_transactions)
+        # grid_transactions = [0, 0, 0, 0]
+        # financial_transactions = [0, 0, 0, 0]
+        # rewards = 1
+        # metrics = {}
+
         rewards, metrics = self.reward.calculate(bids=bids,
                                                  asks=asks,
                                                  grid_transactions=grid_transactions,
@@ -217,8 +195,7 @@ class MCTS:
         # print('metered_r', simulation_env.participants[learning_participant]['metrics']['reward'][ts])
         bids_qty = metrics.pop('bids_quantity', 0)
         asks_qty = metrics.pop('asks_quantity', 0)
-        quantity = bids_qty + asks_qty
-
+        # quantity = bids_qty + asks_qty
         # rewards += access_fee
         # grid_transactions = (grid_buy, self.grid_buy_price, grid_sell, self.grid_sell_price)
         # return rewards, quantity, metrics
@@ -231,14 +208,15 @@ class MCTS:
         if reset_tree:
             print('reset game tree')
             self.init_game_tree()
-        print('starting...')
+        # print('starting...')
         # else:
         #     print('reset visits for the game tree')
         #     self.reset_visits()
         # s_0 = self.encode_states(time=self.time_start)
         for iteration in range(self.max_iterations):
             self.one_rollout_and_backup()
-
+            # print(iteration, self.learner_id)
+        # print('done roll', self.learner_id)
         self.update_policy_from_tree()
         return {self.learner_id: {
             'game_tree': self.game_tree,
@@ -345,42 +323,71 @@ class MCTS:
         return G, cumulative_bids_qty[1] + cumulative_asks_qty[1], avg_prices
 
     def decode_actions(self, a, timestamp):
-        # actions = self.simulation_env.participants[participant]['trader']['actions']
-        # action_types = [action for action in self.simulation_env.participants[participant]['metrics'][ts]]
         actions_dict = {}
         actions = self.learner['trader']['actions']
-        action_types = [action for action in self.learner['metrics'][timestamp]]
-        a = np.unravel_index(int(a), self.shape_action_space)
-        # print(price)
-        # print(a)
-        for action_type in action_types:
-            if action_type in {'bids', 'asks'} and actions['quantity'][a[1]]:
-                actions_dict[action_types[0]] = {
-                    str((timestamp-60, timestamp)): {
-                        'quantity': actions['quantity'][a[1]],
-                        'price': actions['price'][a[0]],
-                        'source': 'solar',
-                        'participant_id': self.learner_id
-                        }
-                    }
-            elif action_type == 'battery':
-                # print(actions)
-                actions_dict['battery'] = {
-                    'target_flux': actions['battery'][a[-1]],
-                    'battery_SoC': None
+        action_idx = np.unravel_index(int(a), self.shape_action_space)
+
+        price = actions['price'][action_idx[0]]
+        quantity = actions['quantity'][action_idx[1]]
+
+        if quantity >= 0:
+            actions_dict['bids'] = {
+                str((timestamp - 60, timestamp)): {
+                    'quantity': quantity,
+                    'price': price,
+                    'participant_id': self.learner_id
                 }
+            }
+        else:
+            actions_dict['asks'] = {
+                str((timestamp - 60, timestamp)): {
+                    'quantity': -quantity,
+                    'price': price,
+                    'source': 'solar',
+                    'participant_id': self.learner_id
+                }
+            }
+        if 'battery' in actions:
+            target_flux = actions['battery'][action_idx[-1]]
+            actions_dict['battery'] = {
+                'target_flux': target_flux,
+                'battery_SoC': None
+            }
 
         return actions_dict
 
     def update_policy_from_tree(self):
+        # print('update pilicuy', self.learner_id)
         self.game_tree['current_node'] = self.game_tree['root_node']
         # print(self.game_tree['current_node'].children)
         timestamp = self.time_start
         while timestamp < self.time_end:
             # n_next = self.game_tree['current_node'].preferred_child_ucb(self.c_adjustment, timestamp >= self.time_end)
-            n_next = self.game_tree['current_node'].preferred_child_greedy(timestamp >= self.time_end)
+            final_layer = timestamp >= self.time_end
+
+            # if merge_nodes:
+                # print('merging nodes...')
+            #     n_next = self.game_tree['current_node'].greedy_merge(final_layer, margin=0.1)
+            #     if n_next is None:
+            #         n_next = self.game_tree['current_node'].preferred_child_greedy(final_layer)
+            #     self.game_tree['current_node'].prune(n_next.action)
+            # else:
+            n_next = self.game_tree['current_node'].preferred_child_greedy(final_layer, prefer='value')
+            self.game_tree['current_node'].prune(n_next.action)
+
             # print(timestamp)
             actions = self.decode_actions(a=n_next.action, timestamp=timestamp)
+            # print(self.learner_id, timestamp, self.learner['metrics'][timestamp], actions)
+
+            # if 'bids' in self.learner['metrics'][timestamp]:
+            # TODO: update this to be more efficient
+            self.learner['metrics'][timestamp].pop('bids', None)
+            self.learner['metrics'][timestamp].pop('asks', None)
+            self.learner['metrics'][timestamp].pop('battery', None)
             self.learner['metrics'][timestamp].update(actions)
+
+            # print(self.learner_id, timestamp, self.learner['metrics'][timestamp], actions)
+
+
             self.game_tree['current_node'] = n_next
             timestamp += 60

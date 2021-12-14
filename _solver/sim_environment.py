@@ -71,8 +71,10 @@ class SimulationEnvironment:
             actions['price'] = sorted(list(np.round(np.linspace(grid_price_sell, grid_price_buy, 9), 5)))
 
         if 'quantity' not in actions or not actions['quantity']:
-            actions['quantity'] = list(range(0, max_qty+1, 1))
+            # actions['quantity'] = list(range(0, max_qty+1, 1))
             # actions['quantity'] = list(range(0, max_qty, 3)) + [max_qty]
+            # actions['quantity'] = [-34, -17, 0, 17, 34]
+            actions['quantity'] = list(range(-max_qty, max_qty+1, 1))
 
         # actions['price'] = tuple(np.linspace(trader['bid_price'], trader['ask_price']imp, 3))
         # actions['price'] = tuple(np.array([0.1]))
@@ -82,9 +84,9 @@ class SimulationEnvironment:
 
         if 'storage' in self.participants[participant]:
             if 'battery' not in actions or not actions['battery']:
-                # actions['battery'] = tuple(range(-20, 20, 1))
+                actions['battery'] = actions['quantity']
                 # actions['battery'] = list(range(-max_qty, max_qty+1, 3))
-                actions['battery'] = list(set(list(-np.array(actions['quantity'])) + actions['quantity']))
+                # actions['battery'] = list(set(list(-np.array(actions['quantity'])) + actions['quantity']))
                 # temporarily disable price and quantity to speed up self consumption sim
                 # actions['price'] = [0]
                 # actions['quantity'] = [0]
@@ -145,7 +147,10 @@ class SimulationEnvironment:
                 # print(participant, t_start, generation, consumption, net_load, action_type)
                 metrics[t_end][action_type] = {str((t_start, t_end)):
                                                    {'quantity': secure_random.choice(actions['quantity']),
-                                                    'price': secure_random.choice(actions['price'][len(actions['price'])//2:]),
+                                                    # 'quantity': net_load,
+                                                    # 'price': actions['price'][-1],
+                                                    'price': secure_random.choice(actions['price']),
+                                                    # 'source': 'solar',
                                                     'participant_id': participant,
                                                     }
                                                }
@@ -153,7 +158,9 @@ class SimulationEnvironment:
                 action_type = 'asks'
                 metrics[t_end][action_type] = {str((t_start, t_end)):
                                                    {'quantity': secure_random.choice(actions['quantity']),
-                                                    'price': secure_random.choice(actions['price'][:len(actions['price'])//2]),
+                                                    # 'quantity': -net_load,
+                                                    # 'price': actions['price'][0],
+                                                    'price': secure_random.choice(actions['price']),
                                                     'source': 'solar',
                                                     'participant_id': participant,
                                                     }

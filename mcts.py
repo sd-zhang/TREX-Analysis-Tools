@@ -224,7 +224,7 @@ class MCTS:
         timestamp, _ = self.decode_states(s_now)  # _ being a placeholder for now
         actions = self.decode_actions(a=a, timestamp=timestamp)
         self.learner['metrics'][timestamp].update(actions)
-        r, _, _, _, _, _ = self.get_reward_for_transactions(timestamp=timestamp)
+        r, _, _, _, _, _, _, _ = self.get_reward_for_transactions(timestamp=timestamp)
         s_next = self.encode_states(time=timestamp)
         return r, s_next
 
@@ -378,7 +378,7 @@ class MCTS:
         # rewards += access_fee
         # grid_transactions = (grid_buy, self.grid_buy_price, grid_sell, self.grid_sell_price)
         # return rewards, quantity, metrics
-        return rewards, metrics, bids_qty, asks_qty, grid_transactions[0], grid_transactions[2]
+        return rewards, metrics, bids_qty, asks_qty, grid_transactions[0], grid_transactions[2], financial_transactions[0], financial_transactions[2]
 
     #ToDo: make sure we reset the node visit numbers
     # make reset tree to reset, make it a string
@@ -472,6 +472,11 @@ class MCTS:
         cumulative_asks_qty = [0, 0]
         cumulative_grid_buy_qty = 0
         cumulative_grid_sell_qty = 0
+        cumulative_financial_buy_qty = 0
+        cumulative_financial_sell_qty = 0
+
+        cumulative_bids_price = 0
+        cumulative_asks_price = 0
 
         # cumulative_quantity = 0
         avg_prices = {}
@@ -482,7 +487,7 @@ class MCTS:
             # return rewards, quantity, metrics
             # r, quantity, avg_price_row = self.get_reward_for_transactions(timestamp)
             # rewards, metrics, bids_qty, asks_qty, grid_transactions[0], grid_transactions[2]
-            r, avg_price_row, bids_qty, asks_qty, grid_buy_qty, grid_sell_qty = \
+            r, avg_price_row, bids_qty, asks_qty, grid_buy_qty, grid_sell_qty, financial_buy_qty, financial_sell_qty = \
                 self.get_reward_for_transactions(timestamp)
             for category in avg_price_row:
                 if category not in avg_prices:
@@ -495,13 +500,17 @@ class MCTS:
             cumulative_asks_qty[1] += asks_qty
             cumulative_grid_buy_qty += grid_buy_qty
             cumulative_grid_sell_qty += grid_sell_qty
+            cumulative_financial_buy_qty += financial_buy_qty
+            cumulative_financial_sell_qty += financial_sell_qty
 
             metric_ts = self.learner['metrics'][timestamp]
             metric_ts['exchanged_qty'] = {
                 'bids': bids_qty,
                 'asks': asks_qty,
                 'grid_buy': grid_buy_qty,
-                'grid_sell': grid_sell_qty
+                'grid_sell': grid_sell_qty,
+                'financial_buy': financial_buy_qty,
+                'financial_sell': financial_sell_qty
             }
             # print(metric_ts)
             # print(timestamp, metric_ts)
@@ -509,10 +518,15 @@ class MCTS:
 
             # metric_ts = self.learner['metrics'][timestamp]
             time_interval = str((timestamp-60, timestamp))
-            bid_actions = metric_ts['bids'][time_interval]['quantity'] if 'bids' in metric_ts else 0
-            ask_actions = metric_ts['asks'][time_interval]['quantity'] if 'asks' in metric_ts else 0
-            cumulative_bids_qty[0] += bid_actions
-            cumulative_asks_qty[0] += ask_actions
+            bid_actions_q = metric_ts['bids'][time_interval]['quantity'] if 'bids' in metric_ts else 0
+            ask_actions_q = metric_ts['asks'][time_interval]['quantity'] if 'asks' in metric_ts else 0
+            cumulative_bids_qty[0] += bid_actions_q
+            cumulative_asks_qty[0] += ask_actions_q
+
+            bid_actions_p = metric_ts['bids'][time_interval]['price'] if 'bids' in metric_ts else 0
+            ask_actions_p = metric_ts['asks'][time_interval]['price'] if 'asks' in metric_ts else 0
+            cumulative_bids_price += bid_actions_p * bid_actions_q
+            cumulative_asks_price += ask_actions_p * ask_actions_q
             # print(bid_actions)
 
         for category in avg_prices:
@@ -527,14 +541,22 @@ class MCTS:
             # print('actions taken:', [action for action in self.learner['metrics'][timestamp]])
 
             stats = [
-                'quantities (b, a, gb, gs): ',
+                'quantities (b, a, gb, gs, fb, fs): ',
                 str(cumulative_bids_qty[0]) + '|' + str(cumulative_bids_qty[1]),
                 str(cumulative_asks_qty[0]) + '|' + str(cumulative_asks_qty[1]),
                 cumulative_grid_buy_qty,
-                cumulative_grid_sell_qty
+                cumulative_grid_sell_qty,
+                cumulative_financial_buy_qty,
+                cumulative_financial_sell_qty
                 ]
 
             print(*stats)
-            print('avg prices: ', avg_prices)
+            print('avg action prices: ',
+                  'bids:', round(cumulative_bids_price/cumulative_bids_qty[0], 4) if cumulative_bids_qty[0] > 0 else np.nan,
+                  'asks:', round(cumulative_asks_price/cumulative_asks_qty[0], 4) if cumulative_asks_qty[0] > 0 else np.nan
+                  )
+            print('avg settle prices: ',
+                  'bids:', round(avg_prices['avg_bid_price'], 4),
+                  'asks:', round(avg_prices['avg_ask_price'], 4))
             print('.........................................')
         return G, cumulative_bids_qty[1] + cumulative_asks_qty[1], avg_prices

@@ -146,7 +146,10 @@ class Market:
         # separate bids into physical and financial
         if total_bids >= consumption:
             # print('tb > c')
-            bid_deficit = total_bids + generation - consumption
+            if consumption >= generation:
+                bid_deficit = total_bids + generation - consumption
+            else:
+                bid_deficit = total_bids - consumption
             # print(total_bids, consumption, generation, bid_deficit)
 
             if battery < 0:
@@ -175,8 +178,6 @@ class Market:
             else:
                 grid_buy -= min(total_bids, bid_deficit)
                 grid_buy += battery
-
-
 
         # print(grid_buy, self.grid_buy_price, grid_sell, self.grid_sell_price)
         elif total_bids < consumption:

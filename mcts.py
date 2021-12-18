@@ -57,7 +57,7 @@ class MCTS:
         # n: number of times this action was taken
 
         self.game_tree = dict()
-        s_0 = self.encode_states(time=time_start)
+        s_0 = self.encode_states(time=time_start-60)
         self.game_tree[s_0] = {'N': 0}
         # return game_tree
 
@@ -84,26 +84,35 @@ class MCTS:
         # action_types = [action for action in self.simulation_env.participants[participant]['metrics'][ts]]
         actions_dict = {}
         actions = self.learner['trader']['actions']
-        action_types = [action for action in self.learner['metrics'][timestamp]]
-        a = np.unravel_index(int(a), self.shape_action_space)
-        # print(price)
-        # print(a)
-        for action_type in action_types:
-            if action_type in {'bids', 'asks'} and actions['quantity'][a[1]]:
-                actions_dict[action_types[0]] = {
-                    str((timestamp-60, timestamp)): {
-                        'quantity': actions['quantity'][a[1]],
-                        'price': actions['price'][a[0]],
-                        'source': 'solar',
-                        'participant_id': self.learner_id
-                        }
-                    }
-            elif action_type == 'battery':
-                # print(actions)
-                actions_dict['battery'] = {
-                    'target_flux': actions['battery'][a[-1]],
-                    'battery_SoC': None
+        # action_types = [action for action in self.learner['metrics'][timestamp]]
+        action_idx = np.unravel_index(int(a), self.shape_action_space)
+
+        price = actions['price'][action_idx[0]]
+        quantity = actions['quantity'][action_idx[1]]
+
+        if quantity >= 0:
+            actions_dict['bids'] = {
+                str((timestamp - 60, timestamp)): {
+                    'quantity': quantity,
+                    'price': price,
+                    'participant_id': self.learner_id
                 }
+            }
+        else:
+            actions_dict['asks'] = {
+                str((timestamp - 60, timestamp)): {
+                    'quantity': -quantity,
+                    'price': price,
+                    'source': 'solar',
+                    'participant_id': self.learner_id
+                }
+            }
+        if 'battery' in actions:
+            target_flux = actions['battery'][action_idx[-1]]
+            actions_dict['battery'] = {
+                'target_flux': target_flux,
+                'battery_SoC': None
+            }
 
         return actions_dict
 
@@ -146,7 +155,7 @@ class MCTS:
         finished = False
         # check of leaf node, if leaf node then do rollout, estimate V of node
         if 'a' not in self.game_tree[s_now]:
-            self.game_tree[s_now]['V'] = self.default_rollout(s_now=s_now)
+            self.game_tree[s_now]['V'] = self.full_rollout(s_now=s_now)
             self.game_tree[s_now]['a'] = dict()
             self.game_tree[s_now]['N'] += 0
 
@@ -174,10 +183,10 @@ class MCTS:
         self.game_tree[s_now]['N'] += 1
 
         # update V estimate for node
-        if s_next not in self.game_tree and ts <= self.time_end:
+        if s_next not in self.game_tree and ts < self.time_end:
             self.game_tree[s_next] = {'N': 0}
 
-        if ts > self.time_end:
+        if ts >= self.time_end:
             finished = True
 
         return s_next, a, finished
@@ -223,29 +232,31 @@ class MCTS:
         # for now the state tuple is: (time)
         timestamp, _ = self.decode_states(s_now)  # _ being a placeholder for now
         actions = self.decode_actions(a=a, timestamp=timestamp)
-        self.learner['metrics'][timestamp].update(actions)
+        self._record_actions(actions, timestamp)
+
         r, _, _, _, _, _, _, _ = self.get_reward_for_transactions(timestamp=timestamp)
         s_next = self.encode_states(time=timestamp)
         return r, s_next
 
-    def one_default_step(self, s_now):
+    def one_rollout_step(self, s_now):
         # here's the two policies that we'll be using for now:
         # UCB for the tree traversal
         # random action selection for rollouts
         finished = False
         a = secure_random.choice(self.linear_action_space)
-        ts, _ = self.decode_states(s_now)
+
         r, s_next = self.evaluate_transition(s_now=s_now,
                                              a=a)
-        if ts == self.time_end:
+        ts, _ = self.decode_states(s_next)
+        if ts >= self.time_end:
             finished = True
         return r, s_next, a, finished
 
-    def default_rollout(self, s_now):
+    def full_rollout(self, s_now):
         finished = False
         v = 0
         while not finished:
-            r, s_next, _, finished = self.one_default_step(s_now=s_now)
+            r, s_next, _, finished = self.one_rollout_step(s_now=s_now)
             s_now = s_next
             v += r
         return v
@@ -396,18 +407,28 @@ class MCTS:
         else:
             print('reset visits for the game tree')
             self.reset_visits()
-        s_0 = self.encode_states(time=self.time_start)
+        s_0 = self.encode_states(time=self.time_start-60)
         for iteration in range(self.max_iterations):
             self.one_rollout_and_backup(s_0)
-
+        self.update_policy_from_tree(s_0)
         return {self.learner_id: {
             'game_tree': self.game_tree,
             's_0': s_0,
             'metrics': self.learner['metrics']
         }}
 
+    def _record_actions(self, actions, timestamp):
+        # print(timestamp, 'wanted')
+        # if timestamp == 1530428520:
+        #    print('aaaa')
+        # print([timestamp for timestamp in self.learner['metrics'].keys()])
+        self.learner['metrics'][timestamp].pop('bids', None)
+        self.learner['metrics'][timestamp].pop('asks', None)
+        self.learner['metrics'][timestamp].pop('battery', None)
+
+        self.learner['metrics'][timestamp].update(actions)
+
     def reset_visits(self):
-        print('.')
         for state in self.game_tree:
             # reset the visits to all s/a pairs to 1
             # reset the visits to all states to num_actions
@@ -435,8 +456,6 @@ class MCTS:
         s_now = self.game_tree[s_now]['a'][a_state]['s_next']
         return a_state, s_now
 
-    # ToDo: seems like this doesnt do what it is supposed to anymore?
-    #  actions do not get saved anywhere....
     # update the policy from the game tree
     def update_policy_from_tree(self, s_0):
         # the idea is to follow a greedy policy from S_0 as long as we can and then switch over to the default rollout policy
@@ -445,7 +464,7 @@ class MCTS:
         while not finished:
             timestamp, _ = self.decode_states(s_now)
             # do we continue? make sure all terminating conditions are checked for here!
-            if timestamp >= self.time_end:
+            if timestamp >= self.time_end-60: #ToDo: check this if this makes sense, seems wrong
                 finished = True
 
             # do we have Q values for this tree? To do so s_now must be in the tree and have action values
@@ -455,15 +474,15 @@ class MCTS:
 
                 else:  # well, use the rollout policy then, give a warnign that we ran into a known leaf node (we know the state but not the values)
                     print('using rollout because we found a known leaf node, maybe adjust c_ubc or num_it')
-                    _, s_now, a_state, finished = self.one_default_step(s_now=s_now)
+                    _, s_now, a_state, finished = self.one_rollout_step(s_now=s_now)
             else:  # use rollout policy, we found a totally unknown leaf node! This is potentially bad
                 print('using rollout because we found an unknown leaf node, perform troubleshoot pls...')
-                _, s_now, a_state, finished = self.one_default_step(s_now=s_now)
+                _, s_now, a_state, finished = self.one_rollout_step(s_now=s_now)
 
             # decoding the actions aleady updates the participants dictionary, not much to do there :-)
 
             actions = self.decode_actions(a=a_state, timestamp=timestamp)
-            self.learner['metrics'][timestamp].update(actions)
+            self._record_actions(actions, timestamp)
 
     # evaluate current policy of a participant inside a game tree and collects some metrics
     def evaluate_policy(self, do_print=True):

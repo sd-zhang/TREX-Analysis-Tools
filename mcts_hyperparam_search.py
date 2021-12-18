@@ -29,13 +29,13 @@ from mcts_nash_solver_3 import Solver
 # c_adjustmen: this will be radically different between BEES and non BEES cases, since BEES makes the tree very tricky
     # take c-adjustment from [1e-4 to 10]
     #
-iterations_per_gen = 1000 # we should set this to a reasonably small value, larger = better and we know it.
+iterations_per_gen = 99 # we should set this to a reasonably small value, larger = better and we know it.
                             # too large and the hyperparameters wont have an effect
                             # at the same time if it is too small the search will favor broad searches too much!
-c_adjustments = [100, 10, 1]
+c_adjustments = [1]
 if __name__ == '__main__':
 
-    config_name = 'TB3C'
+    config_name = 'TB6'
     hyperparameter_search_log = []
     for c_adjustment in c_adjustments:
         hyperparams_search_iterations = []
@@ -44,7 +44,7 @@ if __name__ == '__main__':
             log, participants, game_trees = solver.MA_MCTS(
                 max_it_per_gen=iterations_per_gen,
                 c_adjustment=c_adjustment,
-                hard_reset_game_tree=False)
+                hard_reset_game_tree=True)
 
             print(solver.study_name)
             # lets extract the important info out here:

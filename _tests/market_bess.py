@@ -475,3 +475,14 @@ check = [bids == [('bid', 0, 0.1, 'solar')],
 print('c39', check),
 print(bids, asks, grid_transactions, financial_transactions)
 print('-----')
+
+# case 39: bid more than consumed for a net generator
+market_ledger = [('bid', 10, 0.1, 'solar')]
+bids, asks, grid_transactions, financial_transactions = test_market.deliver(market_ledger, 17, 17, 0)
+check = [bids == [('bid', 0, 0.1, 'solar')],
+         asks == [],
+         grid_transactions == (0, 0.1449, 0, 0.069),
+         financial_transactions == [10, 1.0, 0, 0]]
+print('c40', check),
+print(bids, asks, grid_transactions, financial_transactions)
+print('-----')

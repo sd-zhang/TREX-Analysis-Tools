@@ -182,7 +182,15 @@ class Market:
         # print(grid_buy, self.grid_buy_price, grid_sell, self.grid_sell_price)
         elif total_bids < consumption:
             # print('tb < c')
+            bid_deficit = 0
             residual_consumption = consumption - total_bids - generation
+            if residual_consumption < 0:
+                bid_deficit = -residual_consumption
+                residual_consumption = 0
+            # bid_deficit = total_bids + generation - consumption
+            # print(bid_deficit)
+
+            # print(residual_consumption)
             if battery < 0:
                 # print('bd')
                 residual_battery = -battery - residual_consumption
@@ -194,6 +202,22 @@ class Market:
                     battery -= battery
                     grid_buy += residual_consumption
             else:
+                if bid_deficit:
+                    if bid_deficit < battery:
+                        battery -= bid_deficit
+                        bid_deficit -= bid_deficit
+                    else:
+                        bid_deficit -= battery
+                        battery -= battery
+                        while bid_deficit:
+                            for idx in range(len(bids)):
+                                bid = list(bids[idx])
+                                compensation = min(bid_deficit, bid[1])
+                                financial_buy[0] += compensation
+                                financial_buy[1] += compensation * bid[2]
+                                bid[1] -= compensation
+                                bid_deficit -= compensation
+                                bids[idx] = tuple(bid)
                 # print('bc')
                 grid_buy += residual_consumption + battery
 

@@ -27,5 +27,5 @@ def process_profile(profile_db_location:str, profile_name:str):
 
 if __name__ == "__main__":
     profile_db_location = "postgresql://postgres:postgres@localhost/profiles"
-    profile_name = "test_profile_1kw_square_p4+2"
+    profile_name = "test_profile_1kw_square_p2+1"
     process_profile(profile_db_location, profile_name)

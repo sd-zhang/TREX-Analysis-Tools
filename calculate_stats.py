@@ -39,6 +39,6 @@ def store_stats(profile_db_location, data):
 
 if __name__ == "__main__":
     profile_db_location = "postgresql://postgres:postgres@localhost/profiles"
-    profile_name = "test_profile_1kw_square_p4+2"
+    profile_name = "test_profile_1kw_square_p2+1"
     stats = calculate_stats(profile_db_location, profile_name)
     store_stats(profile_db_location, stats)

@@ -1,0 +1,10 @@
+New Loadshape.Shape_1 npts=1440 minterval=1 mult=(file=Daily_1min_100profiles\Load_profile_1.txt) useactual=true
+New Loadshape.Shape_2 npts=1440 minterval=1 mult=(file=Daily_1min_100profiles\Load_profile_2.txt) useactual=true
+New Loadshape.Shape_3 npts=1440 minterval=1 mult=(file=Daily_1min_100profiles\Load_profile_3.txt) useactual=true
+New Loadshape.Shape_4 npts=1440 minterval=1 mult=(file=Daily_1min_100profiles\Load_profile_4.txt) useactual=true
+New Loadshape.Shape_5 npts=1440 minterval=1 mult=(file=Daily_1min_100profiles\Load_profile_5.txt) useactual=true
+New Loadshape.Shape_6 npts=1440 minterval=1 mult=(file=Daily_1min_100profiles\Load_profile_6.txt) useactual=true
+New Loadshape.Shape_7 npts=1440 minterval=1 mult=(file=Daily_1min_100profiles\Load_profile_7.txt) useactual=true
+New Loadshape.Shape_8 npts=1440 minterval=1 mult=(file=Daily_1min_100profiles\Load_profile_8.txt) useactual=true
+New Loadshape.Shape_9 npts=1440 minterval=1 mult=(file=Daily_1min_100profiles\Load_profile_9.txt) useactual=true
+New Loadshape.Shape_10 npts=1440 minterval=1 mult=(file=Daily_1min_100profiles\Load_profile_10.txt) useactual=true

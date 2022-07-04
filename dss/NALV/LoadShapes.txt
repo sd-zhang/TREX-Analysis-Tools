@@ -1,0 +1,10 @@
+New Loadshape.Shape_0 npts=1440 mult=(file=load_profiles\0.csv) useactual=true
+New Loadshape.Shape_1 npts=1440 mult=(file=load_profiles\1.csv) useactual=true
+New Loadshape.Shape_2 npts=1440 mult=(file=load_profiles\2.csv) useactual=true
+New Loadshape.Shape_3 npts=1440 mult=(file=load_profiles\3.csv) useactual=true
+New Loadshape.Shape_4 npts=1440 mult=(file=load_profiles\4.csv) useactual=true
+New Loadshape.Shape_5 npts=1440 mult=(file=load_profiles\5.csv) useactual=true
+New Loadshape.Shape_6 npts=1440 mult=(file=load_profiles\6.csv) useactual=true
+New Loadshape.Shape_7 npts=1440 mult=(file=load_profiles\7.csv) useactual=true
+New Loadshape.Shape_8 npts=1440 mult=(file=load_profiles\8.csv) useactual=true
+New Loadshape.Shape_9 npts=1440 mult=(file=load_profiles\9.csv) useactual=true

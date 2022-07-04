@@ -1,0 +1,5 @@
+New LineCode.OH1 nphases=1 R1=0.1509 X1=0.099 R0=0 X0=0 C1=0 C0=0 Units=km
+New LineCode.OH2 nphases=1 R1=0.6056 X1=0.1503 R0=0 X0=0 C1=0 C0=0 Units=km
+New LineCode.OH3 nphases=1 R1=0.3018 X1=0.1265 R0=0 X0=0 C1=0 C0=0 Units=km
+New LineCode.UG1 nphases=1 R1=0.1827 X1=0.0711 R0=0 X0=0 C1=0 C0=0 Units=km
+New LineCode.UG2 nphases=1 R1=0.3018 X1=0.1265 R0=0 X0=0 C1=0 C0=0 Units=km

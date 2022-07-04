@@ -1,0 +1,31 @@
+clear
+Set DefaultBaseFrequency=60
+
+New circuit.LVTest
+Edit Vsource.Source BasekV=11 pu=1.05  ISC3=3000  ISC1=5
+~ basekv=7.2 pu=1.00 MVAsc3=100 MVAsc1=100
+
+! Substation Transformer
+New Transformer.XFM Phases=1 Windings=2 Xhl=8
+~ wdg=1 bus=sourcebus.1 conn=Wye kv=7.2   kva=50   %r=1
+~ wdg=2 bus=R1 conn=Wye kv=0.24  kva=50   %r=1
+! ~ wdg=2 bus=R1 conn=Wye kv=0.24  kva=50   %r=1
+
+Redirect LineCode.txt
+
+Redirect LoadShapes.txt
+batchedit loadshape.. npts=1440, useactual=yes
+Redirect Lines.txt
+Redirect Transformers.txt
+Redirect Loads.txt
+
+Set voltagebases=[7.2  .24]
+Calcvoltagebases
+
+! buscoords buscoords.txt
+
+set mode=daily
+set number = 24
+set stepsize=1h
+
+solve

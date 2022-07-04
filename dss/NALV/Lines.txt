@@ -1,0 +1,13 @@
+New Line.R1-2 Bus1=R1 Bus2=R2 phases=1 Linecode=OH1 Length=25 Units=m
+New Line.R1-5 Bus1=R1 Bus2=R5 phases=1 Linecode=OH3 Length=25 Units=m
+New Line.R1-6 Bus1=R1 Bus2=R6 phases=1 Linecode=OH2 Length=25 Units=m
+New Line.R1-7 Bus1=R1 Bus2=R7 phases=1 Linecode=OH3 Length=50 Units=m
+New Line.R2-3 Bus1=R2 Bus2=R3 phases=1 Linecode=UG1 Length=25 Units=m
+New Line.R2-8 Bus1=R2 Bus2=R8 phases=1 Linecode=OH3 Length=25 Units=m
+New Line.R2-9 Bus1=R2 Bus2=R9 phases=1 Linecode=OH3 Length=25 Units=m
+New Line.R2-10 Bus1=R2 Bus2=R10 phases=1 Linecode=OH2 Length=25 Units=m
+New Line.R3-4 Bus1=R3 Bus2=R4 phases=1 Linecode=UG1 Length=25 Units=m
+New Line.R3-11 Bus1=R3 Bus2=R11 phases=1 Linecode=UG1 Length=17 Units=m
+New Line.R3-12 Bus1=R3 Bus2=R12 phases=1 Linecode=UG2 Length=25 Units=m
+New Line.R4-13 Bus1=R4 Bus2=R13 phases=1 Linecode=UG2 Length=17 Units=m
+New Line.R4-14 Bus1=R4 Bus2=R14 phases=1 Linecode=UG2 Length=25 Units=m
